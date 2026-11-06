@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,8 +7,10 @@
 
     <title>AYANET | Shop Management</title>
     <meta name="description" content="Welcome to AYANET Shop Management System.">
-
     <meta name="theme-color" content="#102b50">
+
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" href="./admin/icon-192.png">
 
     <style>
         * {
@@ -125,6 +128,17 @@
     <footer>
         <p>AYANET Shop Management &copy; 2026</p>
     </footer>
+
+    <script>
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", function () {
+                navigator.serviceWorker.register("./service-worker.js")
+                    .catch(function (error) {
+                        console.error("AYANET service worker registration failed:", error);
+                    });
+            });
+        }
+    </script>
 
 </body>
 </html>
