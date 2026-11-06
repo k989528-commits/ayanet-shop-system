@@ -1,53 +1,130 @@
-﻿
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANET Admin Dashboard</title>
 
-    <link rel="stylesheet" href="admin.css">
+    <title>AYANET | Shop Management</title>
+    <meta name="description" content="Welcome to AYANET Shop Management System.">
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta name="theme-color" content="#102b50">
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #f3f6fb;
+            color: #263449;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background: #102b50;
+            color: white;
+            padding: 22px 7%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        header h1 {
+            font-size: 25px;
+            color: #f4c542;
+        }
+
+        header span {
+            font-size: 14px;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 50px 20px;
+            text-align: center;
+        }
+
+        .welcome {
+            max-width: 650px;
+            background: white;
+            padding: 50px 30px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.07);
+        }
+
+        .welcome h2 {
+            color: #102b50;
+            font-size: 34px;
+            margin-bottom: 18px;
+        }
+
+        .welcome p {
+            font-size: 17px;
+            line-height: 1.7;
+            color: #64748b;
+            margin-bottom: 28px;
+        }
+
+        .admin-button {
+            display: inline-block;
+            background: #102b50;
+            color: white;
+            text-decoration: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .admin-button:hover {
+            background: #1d4779;
+        }
+
+        footer {
+            background: #102b50;
+            color: white;
+            text-align: center;
+            padding: 18px;
+            font-size: 13px;
+        }
+    </style>
 </head>
 
 <body>
 
-<header>
-    <h2>AYANET SHOP MANAGEMENT</h2>
-    <span>Admin Dashboard</span>
-</header>
+    <header>
+        <h1>AYANET</h1>
+        <span>Shop Management System</span>
+    </header>
 
-<main>
-    <h2>Welcome to AYANET</h2>
-    <p>Shop Management System</p>
+    <main>
+        <section class="welcome">
+            <h2>Welcome to AYANET</h2>
 
-    <section>
-        <h3>Dashboard</h3>
-        <p>Manage your shop records here.</p>
-    </section>
+            <p>
+                Your shop management system.
+                Manage products, sales, stock, expenses
+                and business performance in one place.
+            </p>
 
-    <section>
-        <h3>Orders</h3>
-        <p>View and manage customer orders.</p>
-    </section>
+            <a class="admin-button" href="./admin/dashboard.html">
+                Admin Login
+            </a>
+        </section>
+    </main>
 
-    <section>
-        <h3>Products</h3>
-        <p>Manage your shop products.</p>
-    </section>
-
-    <section>
-        <h3>Sales</h3>
-        <p>Monitor your shop sales.</p>
-    </section>
-</main>
-
-<footer>
-    <p>AYANET Shop Management © 2026</p>
-</footer>
-
-<script src="script.js"></script>
+    <footer>
+        <p>AYANET Shop Management &copy; 2026</p>
+    </footer>
 
 </body>
 </html>
