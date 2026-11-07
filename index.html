@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>AYANET | Shop Management</title>
-    <meta name="description" content="Welcome to AYANET Shop Management System.">
+    <title>AYANET | Your One Stop Shop</title>
+    <meta name="description" content="Welcome to AYANET. Order printing, photocopying, online applications, phone repair and more.">
     <meta name="theme-color" content="#102b50">
 
     <link rel="manifest" href="./manifest.json">
@@ -23,122 +23,362 @@
             font-family: Arial, sans-serif;
             background: #f3f6fb;
             color: #263449;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
         }
 
         header {
             background: #102b50;
             color: white;
-            padding: 22px 7%;
+            padding: 20px 7%;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 12px;
+            gap: 15px;
         }
 
         header h1 {
-            font-size: 25px;
             color: #f4c542;
+            font-size: 28px;
         }
 
-        header span {
-            font-size: 14px;
-        }
-
-        main {
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 50px 20px;
-            text-align: center;
-        }
-
-        .welcome {
-            max-width: 650px;
-            background: white;
-            padding: 50px 30px;
-            border-radius: 16px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.07);
-        }
-
-        .welcome h2 {
-            color: #102b50;
-            font-size: 34px;
-            margin-bottom: 18px;
-        }
-
-        .welcome p {
-            font-size: 17px;
-            line-height: 1.7;
-            color: #64748b;
-            margin-bottom: 28px;
-        }
-
-        .admin-button {
-            display: inline-block;
-            background: #102b50;
+        header a {
             color: white;
             text-decoration: none;
-            padding: 15px 30px;
-            border-radius: 8px;
-            font-weight: bold;
+            border: 1px solid #f4c542;
+            padding: 10px 17px;
+            border-radius: 7px;
         }
 
-        .admin-button:hover {
+        .hero {
+            background: #102b50;
+            color: white;
+            text-align: center;
+            padding: 65px 20px;
+        }
+
+        .hero h2 {
+            color: #f4c542;
+            font-size: 36px;
+            margin-bottom: 15px;
+        }
+
+        .hero p {
+            font-size: 17px;
+            line-height: 1.7;
+        }
+
+        .section {
+            max-width: 1050px;
+            margin: auto;
+            padding: 45px 20px;
+        }
+
+        .section h2 {
+            text-align: center;
+            color: #102b50;
+            margin-bottom: 25px;
+            font-size: 27px;
+        }
+
+        .services {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+        }
+
+        .service {
+            background: white;
+            padding: 25px 18px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
+            border-bottom: 3px solid #f4c542;
+        }
+
+        .service .symbol {
+            font-size: 32px;
+            margin-bottom: 12px;
+        }
+
+        .service h3 {
+            color: #102b50;
+            margin-bottom: 9px;
+        }
+
+        .service p {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .order-section {
+            max-width: 650px;
+            margin: 10px auto 50px;
+            padding: 30px 22px;
+            background: white;
+            border-radius: 14px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.07);
+        }
+
+        .order-section h2 {
+            color: #102b50;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .order-section > p {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 25px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            margin: 17px 0 7px;
+            color: #102b50;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 13px;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            font-size: 15px;
+            font-family: Arial, sans-serif;
+        }
+
+        textarea {
+            min-height: 110px;
+            resize: vertical;
+        }
+
+        button {
+            width: 100%;
+            background: #102b50;
+            color: white;
+            padding: 15px;
+            border: none;
+            border-radius: 7px;
+            margin-top: 22px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:hover {
             background: #1d4779;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #message {
+            margin-top: 18px;
+            text-align: center;
+            font-weight: bold;
+            line-height: 1.5;
         }
 
         footer {
             background: #102b50;
             color: white;
             text-align: center;
-            padding: 18px;
-            font-size: 13px;
+            padding: 25px 15px;
+            line-height: 1.8;
+        }
+
+        footer strong {
+            color: #f4c542;
         }
     </style>
 </head>
 
 <body>
 
-    <header>
-        <h1>AYANET</h1>
-        <span>Shop Management System</span>
-    </header>
+<header>
+    <h1>AYANET</h1>
+    <a href="./admin/dashboard.html">Admin Login</a>
+</header>
 
-    <main>
-        <section class="welcome">
-            <h2>Welcome to AYANET</h2>
+<section class="hero">
+    <h2>WELCOME TO AYANET</h2>
+    <p>Your One Stop Shop – Learn, Work and Grow.</p>
+    <p>Order our services from the comfort of your home.</p>
+</section>
 
-            <p>
-                Your shop management system.
-                Manage products, sales, stock, expenses
-                and business performance in one place.
-            </p>
+<section class="section">
+    <h2>OUR SERVICES</h2>
 
-            <a class="admin-button" href="./admin/dashboard.html">
-                Admin Login
-            </a>
-        </section>
-    </main>
+    <div class="services">
 
-    <footer>
-        <p>AYANET Shop Management &copy; 2026</p>
-    </footer>
+        <div class="service">
+            <div class="symbol">🖨️</div>
+            <h3>Printing</h3>
+            <p>Quality document and photo printing services.</p>
+        </div>
 
-    <script>
-        if ("serviceWorker" in navigator) {
-            window.addEventListener("load", function () {
-                navigator.serviceWorker.register("./service-worker.js")
-                    .catch(function (error) {
-                        console.error("AYANET service worker registration failed:", error);
-                    });
-            });
+        <div class="service">
+            <div class="symbol">📄</div>
+            <h3>Photocopy & Scanning</h3>
+            <p>Fast and reliable photocopying and scanning.</p>
+        </div>
+
+        <div class="service">
+            <div class="symbol">💻</div>
+            <h3>Online Applications</h3>
+            <p>Assistance with online applications and services.</p>
+        </div>
+
+        <div class="service">
+            <div class="symbol">📝</div>
+            <h3>CV Writing & Typing</h3>
+            <p>Professional CV preparation and document typing.</p>
+        </div>
+
+        <div class="service">
+            <div class="symbol">📚</div>
+            <h3>Books & Stationery</h3>
+            <p>School books, exercise books and stationery.</p>
+        </div>
+
+        <div class="service">
+            <div class="symbol">📱</div>
+            <h3>Phone Repair</h3>
+            <p>Phone repair and technical support services.</p>
+        </div>
+
+    </div>
+</section>
+
+<section class="order-section">
+
+    <h2>PLACE YOUR ORDER</h2>
+    <p>Fill in the details below and submit your order to AYANET.</p>
+
+    <form id="orderForm">
+
+        <label for="customerName">Your Full Name</label>
+        <input
+            type="text"
+            id="customerName"
+            placeholder="Enter your name"
+            required
+        >
+
+        <label for="customerPhone">Phone Number</label>
+        <input
+            type="tel"
+            id="customerPhone"
+            placeholder="Enter your phone number"
+            required
+        >
+
+        <label for="serviceName">Select a Service</label>
+        <select id="serviceName" required>
+            <option value="">-- Choose a Service --</option>
+            <option>Printing</option>
+            <option>Photocopy & Scanning</option>
+            <option>Online Applications</option>
+            <option>CV Writing & Typing</option>
+            <option>Books & Stationery</option>
+            <option>Phone Repair</option>
+        </select>
+
+        <label for="orderDetails">Order Details</label>
+        <textarea
+            id="orderDetails"
+            placeholder="Describe what you need..."
+            required
+        ></textarea>
+
+        <button type="submit" id="submitButton">
+            SUBMIT ORDER
+        </button>
+
+        <div id="message" role="status"></div>
+
+    </form>
+
+</section>
+
+<footer>
+    <strong>AYANET</strong><br>
+    Your One Stop Shop – Learn, Work and Grow.<br>
+    AYANET Shop Management &copy; 2026
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    const db = window.supabase.createClient(
+        "https://jltadhukraspfdaxbvwo.supabase.co",
+        "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
+    );
+
+    const form = document.getElementById("orderForm");
+    const button = document.getElementById("submitButton");
+    const message = document.getElementById("message");
+
+    form.addEventListener("submit", async function(event) {
+
+        event.preventDefault();
+
+        button.disabled = true;
+        button.textContent = "SUBMITTING...";
+        message.textContent = "";
+
+        const order = {
+            customer_name: document.getElementById("customerName").value.trim(),
+            customer_phone: document.getElementById("customerPhone").value.trim(),
+            service_name: document.getElementById("serviceName").value,
+            order_details: document.getElementById("orderDetails").value.trim()
+        };
+
+        try {
+
+            const { error } = await db
+                .from("orders")
+                .insert([order]);
+
+            if (error) {
+                throw error;
+            }
+
+            message.style.color = "green";
+            message.textContent =
+                "Your order has been submitted successfully! Thank you for choosing AYANET.";
+
+            form.reset();
+
+        } catch (error) {
+
+            console.error("AYANET order error:", error);
+
+            message.style.color = "red";
+            message.textContent =
+                "Sorry, your order could not be submitted. Please try again or contact AYANET.";
+
+        } finally {
+
+            button.disabled = false;
+            button.textContent = "SUBMIT ORDER";
+
         }
-    </script>
+
+    });
+
+    if ("serviceWorker" in navigator) {
+        window.addEventListener("load", function() {
+            navigator.serviceWorker.register("./service-worker.js")
+                .catch(function(error) {
+                    console.error("Service worker error:", error);
+                });
+        });
+    }
+</script>
 
 </body>
 </html>
