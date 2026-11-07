@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +7,6 @@
     <title>AYANET Admin Dashboard</title>
 
     <link rel="stylesheet" href="admin.css">
-
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -34,134 +32,199 @@
     <div id="adminDashboard" style="display: none;">
 
         <header>
-            <h1>Welcome to AYANET</h1>
-            <p>Shop Management System</p>
+            <div>
+                <h1>Welcome to AYANET</h1>
+                <p>Shop Management System</p>
+            </div>
             <button id="logoutButton" type="button">Logout</button>
         </header>
 
-        <section id="dashboardSection">
-            <h2>Dashboard</h2>
-            <p>Manage your shop records here.</p>
-        </section>
+        <main>
 
-        <section id="ordersSection">
-            <h2>Orders</h2>
-            <p>View and manage customer orders.</p>
-            <div id="orders"></div>
-        </section>
+            <section id="dashboardSection">
+                <h2>Dashboard</h2>
+                <p>Manage your shop records here.</p>
+            </section>
 
-        <section id="productsSection">
-            <h2>Products</h2>
-            <p>Manage your shop products.</p>
+            <!-- SERVICE MANAGEMENT -->
+            <section id="serviceManagementSection">
+                <h2>Service Management</h2>
+                <p>Add service categories, services and customer prices.</p>
 
-            <form id="productForm">
+                <div class="card">
+                    <h3>Add a Service</h3>
 
-                <input type="text" id="productName"
-                    placeholder="Product Name" required>
+                    <form id="serviceForm">
 
-                <textarea id="productDescription"
-                    placeholder="Description"></textarea>
+                        <label for="serviceCategory">
+                            Service Category
+                        </label>
+                        <input type="text" id="serviceCategory"
+                            placeholder="e.g. Printing" required>
 
-                <label for="productCostPrice">Buying Price (KSh)</label>
-                <input type="number" id="productCostPrice"
-                    placeholder="Supplier buying price"
-                    min="0.01" step="0.01" required>
+                        <label for="serviceName">
+                            Service Name
+                        </label>
+                        <input type="text" id="serviceName"
+                            placeholder="e.g. Black and White Printing"
+                            required>
 
-                <label for="productPrice">Selling Price (KSh)</label>
-                <input type="number" id="productPrice"
-                    placeholder="Customer selling price"
-                    min="0.01" step="0.01" required>
+                        <label for="serviceDescription">
+                            Description
+                        </label>
+                        <textarea id="serviceDescription"
+                            placeholder="Describe this service"></textarea>
 
-                <label for="productStock">Initial Stock</label>
-                <input type="number" id="productStock"
-                    placeholder="Stock quantity"
-                    min="0" step="1" required>
+                        <label for="servicePrice">
+                            Customer Price (KSh)
+                        </label>
+                        <input type="number" id="servicePrice"
+                            min="0" step="0.01"
+                            placeholder="Enter price" required>
 
-                <button type="submit">Add Product</button>
+                        <button type="submit">Add Service</button>
 
-                <p id="productMessage"></p>
-            </form>
+                        <p id="serviceMessage"></p>
+                    </form>
+                </div>
 
-            <div id="products"></div>
-        </section>
+                <div class="card">
+                    <h3>Available Services</h3>
+                    <div id="services">
+                        <p>Services will appear here.</p>
+                    </div>
+                </div>
+            </section>
 
-        <section id="salesSection">
-            <h2>Record a Sale</h2>
+            <!-- CUSTOMER ORDERS -->
+            <section id="ordersSection">
+                <h2>Orders</h2>
+                <p>View and manage customer orders.</p>
+                <div id="orders"></div>
+            </section>
 
-            <form id="saleForm">
+            <!-- PRODUCTS -->
+            <section id="productsSection">
+                <h2>Products</h2>
+                <p>Manage your shop products.</p>
 
-                <label for="saleProduct">Select Product</label>
-                <select id="saleProduct" required>
-                    <option value="">Select a product</option>
-                </select>
+                <form id="productForm">
 
-                <label for="saleQuantity">Quantity</label>
-                <input type="number" id="saleQuantity"
-                    min="1" placeholder="Quantity" required>
+                    <input type="text" id="productName"
+                        placeholder="Product Name" required>
 
-                <button type="submit">Record Sale</button>
-                <p id="saleMessage"></p>
-            </form>
-        </section>
+                    <textarea id="productDescription"
+                        placeholder="Description"></textarea>
 
-        <section id="expensesSection">
-            <h2>Shop Expenses</h2>
-            <p>Record and manage your shop expenses.</p>
+                    <label for="productCostPrice">Buying Price (KSh)</label>
+                    <input type="number" id="productCostPrice"
+                        placeholder="Supplier buying price"
+                        min="0.01" step="0.01" required>
 
-            <form id="expenseForm">
+                    <label for="productPrice">Selling Price (KSh)</label>
+                    <input type="number" id="productPrice"
+                        placeholder="Customer selling price"
+                        min="0.01" step="0.01" required>
 
-                <label for="expenseDescription">Expense Description</label>
-                <input type="text" id="expenseDescription"
-                    placeholder="e.g. Electricity bill"
-                    required>
+                    <label for="productStock">Initial Stock</label>
+                    <input type="number" id="productStock"
+                        placeholder="Stock quantity"
+                        min="0" step="1" required>
 
-                <label for="expenseCategory">Expense Category</label>
-                <select id="expenseCategory" required>
-                    <option value="">Select category</option>
-                    <option value="Rent">Rent</option>
-                    <option value="Electricity">Electricity</option>
-                    <option value="Transport">Transport</option>
-                    <option value="Water">Water</option>
-                    <option value="Internet">Internet</option>
-                    <option value="Other">Other</option>
-                </select>
+                    <button type="submit">Add Product</button>
 
-                <label for="expenseAmount">Amount (KSh)</label>
-                <input type="number" id="expenseAmount"
-                    placeholder="Enter amount"
-                    min="0.01" step="0.01" required>
+                    <p id="productMessage"></p>
+                </form>
 
-                <button type="submit">Record Expense</button>
+                <div id="products"></div>
+            </section>
 
-                <p id="expenseMessage"></p>
-            </form>
+            <!-- RECORD SALES -->
+            <section id="salesSection">
+                <h2>Record a Sale</h2>
 
-            <h3>Expense History</h3>
-            <div id="expenses"></div>
-        </section>
+                <form id="saleForm">
 
-        <section id="dailySummarySection">
-            <h2>Today's Sales Summary</h2>
-            <p>Total Sales: KSh <span id="totalSalesToday">0.00</span></p>
-            <p>Items Sold: <span id="itemsSoldToday">0</span></p>
-            <p>Transactions: <span id="transactionsToday">0</span></p>
-        </section>
+                    <label for="saleProduct">Select Product</label>
+                    <select id="saleProduct" required>
+                        <option value="">Select a product</option>
+                    </select>
 
-        <section id="monthlySummarySection">
-            <h2>Monthly Sales Summary</h2>
-            <p>Total Sales: KSh <span id="totalSalesMonth">0.00</span></p>
-            <p>Items Sold: <span id="itemsSoldMonth">0</span></p>
-            <p>Transactions: <span id="transactionsMonth">0</span></p>
-        </section>
+                    <label for="saleQuantity">Quantity</label>
+                    <input type="number" id="saleQuantity"
+                        min="1" placeholder="Quantity" required>
 
-        <section id="salesHistorySection">
-            <h2>Sales History</h2>
-            <div id="sales"></div>
-        </section>
+                    <button type="submit">Record Sale</button>
+                    <p id="saleMessage"></p>
+                </form>
+            </section>
 
+            <!-- SHOP EXPENSES -->
+            <section id="expensesSection">
+                <h2>Shop Expenses</h2>
+                <p>Record and manage your shop expenses.</p>
+
+                <form id="expenseForm">
+
+                    <label for="expenseDescription">
+                        Expense Description
+                    </label>
+                    <input type="text" id="expenseDescription"
+                        placeholder="e.g. Electricity bill" required>
+
+                    <label for="expenseCategory">
+                        Expense Category
+                    </label>
+                    <select id="expenseCategory" required>
+                        <option value="">Select category</option>
+                        <option value="Rent">Rent</option>
+                        <option value="Electricity">Electricity</option>
+                        <option value="Transport">Transport</option>
+                        <option value="Water">Water</option>
+                        <option value="Internet">Internet</option>
+                        <option value="Other">Other</option>
+                    </select>
+
+                    <label for="expenseAmount">Amount (KSh)</label>
+                    <input type="number" id="expenseAmount"
+                        placeholder="Enter amount"
+                        min="0.01" step="0.01" required>
+
+                    <button type="submit">Record Expense</button>
+
+                    <p id="expenseMessage"></p>
+                </form>
+
+                <h3>Expense History</h3>
+                <div id="expenses"></div>
+            </section>
+
+            <!-- DAILY SUMMARY -->
+            <section id="dailySummarySection">
+                <h2>Today's Sales Summary</h2>
+                <p>Total Sales: KSh <span id="totalSalesToday">0.00</span></p>
+                <p>Items Sold: <span id="itemsSoldToday">0</span></p>
+                <p>Transactions: <span id="transactionsToday">0</span></p>
+            </section>
+
+            <!-- MONTHLY SUMMARY -->
+            <section id="monthlySummarySection">
+                <h2>Monthly Sales Summary</h2>
+                <p>Total Sales: KSh <span id="totalSalesMonth">0.00</span></p>
+                <p>Items Sold: <span id="itemsSoldMonth">0</span></p>
+                <p>Transactions: <span id="transactionsMonth">0</span></p>
+            </section>
+
+            <!-- SALES HISTORY -->
+            <section id="salesHistorySection">
+                <h2>Sales History</h2>
+                <div id="sales"></div>
+            </section>
+
+        </main>
     </div>
 
-    <script src="admin.js?v=20261106-2"></script>
+    <script src="admin.js?v=20261107-1"></script>
 
 </body>
 </html>
