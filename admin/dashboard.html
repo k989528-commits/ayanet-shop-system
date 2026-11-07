@@ -4,39 +4,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
     <title>AYANET Admin Dashboard</title>
-
     <link rel="stylesheet" href="admin.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
-
 <body>
 
     <div id="loginSection">
         <h1>AYANET Admin Login</h1>
-
         <form id="adminLoginForm">
             <label for="adminEmail">Email</label>
-            <input type="email" id="adminEmail"
-                placeholder="Enter admin email" required>
+            <input type="email" id="adminEmail" required>
 
             <label for="adminPassword">Password</label>
-            <input type="password" id="adminPassword"
-                placeholder="Enter password" required>
+            <input type="password" id="adminPassword" required>
 
             <button type="submit">Login</button>
             <p id="loginMessage"></p>
         </form>
     </div>
 
-    <div id="adminDashboard" style="display: none;">
+    <div id="adminDashboard" style="display:none;">
 
         <header>
-            <div>
-                <h1>Welcome to AYANET</h1>
-                <p>Shop Management System</p>
-            </div>
+            <h1>Welcome to AYANET</h1>
+            <p>Shop Management System</p>
             <button id="logoutButton" type="button">Logout</button>
         </header>
 
@@ -47,126 +39,87 @@
                 <p>Manage your shop records here.</p>
             </section>
 
-            <!-- SERVICE MANAGEMENT -->
             <section id="serviceManagementSection">
                 <h2>Service Management</h2>
                 <p>Add service categories, services and customer prices.</p>
 
-                <div class="card">
-                    <h3>Add a Service</h3>
+                <h3>Add a Service</h3>
+                <form id="serviceForm">
+                    <label for="serviceCategory">Service Category</label>
+                    <input type="text" id="serviceCategory" required>
 
-                    <form id="serviceForm">
+                    <label for="serviceName">Service Name</label>
+                    <input type="text" id="serviceName" required>
 
-                        <label for="serviceCategory">Service Category</label>
-                        <input type="text" id="serviceCategory"
-                            placeholder="e.g. Printing" required>
+                    <label for="serviceDescription">Description</label>
+                    <textarea id="serviceDescription"></textarea>
 
-                        <label for="serviceName">Service Name</label>
-                        <input type="text" id="serviceName"
-                            placeholder="e.g. Black and White Printing"
-                            required>
+                    <label for="servicePrice">Customer Price (KSh)</label>
+                    <input type="number" id="servicePrice" min="0" step="0.01" required>
 
-                        <label for="serviceDescription">Description</label>
-                        <textarea id="serviceDescription"
-                            placeholder="Describe this service"></textarea>
+                    <button type="submit">Add Service</button>
+                    <p id="serviceMessage"></p>
+                </form>
 
-                        <label for="servicePrice">Customer Price (KSh)</label>
-                        <input type="number" id="servicePrice"
-                            min="0" step="0.01"
-                            placeholder="Enter price" required>
-
-                        <button type="submit">Add Service</button>
-                        <p id="serviceMessage"></p>
-                    </form>
-                </div>
-
-                <div class="card">
-                    <h3>Available Services</h3>
-                    <div id="services">
-                        <p>Services will appear here.</p>
-                    </div>
-                </div>
+                <h3>Available Services</h3>
+                <div id="services"></div>
             </section>
 
-            <!-- CUSTOMER ORDERS -->
             <section id="ordersSection">
                 <h2>Orders</h2>
-                <p>View and manage customer orders.</p>
                 <div id="orders"></div>
             </section>
 
-            <!-- PRODUCTS -->
             <section id="productsSection">
                 <h2>Products</h2>
                 <p>Manage your shop products.</p>
 
                 <form id="productForm">
+                    <label for="productName">Product Name</label>
+                    <input type="text" id="productName" required>
 
-                    <input type="text" id="productName"
-                        placeholder="Product Name" required>
-
-                    <textarea id="productDescription"
-                        placeholder="Description"></textarea>
+                    <label for="productDescription">Description</label>
+                    <textarea id="productDescription"></textarea>
 
                     <label for="productCostPrice">Buying Price (KSh)</label>
-                    <input type="number" id="productCostPrice"
-                        placeholder="Supplier buying price"
-                        min="0.01" step="0.01" required>
+                    <input type="number" id="productCostPrice" min="0.01" step="0.01" required>
 
                     <label for="productPrice">Selling Price (KSh)</label>
-                    <input type="number" id="productPrice"
-                        placeholder="Customer selling price"
-                        min="0.01" step="0.01" required>
+                    <input type="number" id="productPrice" min="0.01" step="0.01" required>
 
                     <label for="productStock">Initial Stock</label>
-                    <input type="number" id="productStock"
-                        placeholder="Stock quantity"
-                        min="0" step="1" required>
+                    <input type="number" id="productStock" min="0" step="1" required>
 
                     <button type="submit">Add Product</button>
-
                     <p id="productMessage"></p>
                 </form>
 
                 <div id="products"></div>
             </section>
 
-            <!-- RECORD SALES -->
             <section id="salesSection">
                 <h2>Record a Sale</h2>
-
                 <form id="saleForm">
-
                     <label for="saleProduct">Select Product</label>
                     <select id="saleProduct" required>
                         <option value="">Select a product</option>
                     </select>
 
                     <label for="saleQuantity">Quantity</label>
-                    <input type="number" id="saleQuantity"
-                        min="1" placeholder="Quantity" required>
+                    <input type="number" id="saleQuantity" min="1" required>
 
                     <button type="submit">Record Sale</button>
                     <p id="saleMessage"></p>
                 </form>
             </section>
 
-            <!-- SHOP EXPENSES -->
             <section id="expensesSection">
                 <h2>Shop Expenses</h2>
-                <p>Record and manage your shop expenses.</p>
-
                 <form id="expenseForm">
+                    <label for="expenseDescription">Expense Description</label>
+                    <input type="text" id="expenseDescription" required>
 
-                    <label for="expenseDescription">
-                        Expense Description
-                    </label>
-                    <input type="text" id="expenseDescription"
-                        placeholder="e.g. Electricity bill" required>
-
-                    <label for="expenseCategory">
-                        Expense Category
-                    </label>
+                    <label for="expenseCategory">Expense Category</label>
                     <select id="expenseCategory" required>
                         <option value="">Select category</option>
                         <option value="Rent">Rent</option>
@@ -178,9 +131,7 @@
                     </select>
 
                     <label for="expenseAmount">Amount (KSh)</label>
-                    <input type="number" id="expenseAmount"
-                        placeholder="Enter amount"
-                        min="0.01" step="0.01" required>
+                    <input type="number" id="expenseAmount" min="0.01" step="0.01" required>
 
                     <button type="submit">Record Expense</button>
                     <p id="expenseMessage"></p>
@@ -190,7 +141,6 @@
                 <div id="expenses"></div>
             </section>
 
-            <!-- DAILY SUMMARY -->
             <section id="dailySummarySection">
                 <h2>Today's Sales Summary</h2>
                 <p>Total Sales: KSh <span id="totalSalesToday">0.00</span></p>
@@ -198,7 +148,6 @@
                 <p>Transactions: <span id="transactionsToday">0</span></p>
             </section>
 
-            <!-- MONTHLY SUMMARY -->
             <section id="monthlySummarySection">
                 <h2>Monthly Sales Summary</h2>
                 <p>Total Sales: KSh <span id="totalSalesMonth">0.00</span></p>
@@ -206,7 +155,6 @@
                 <p>Transactions: <span id="transactionsMonth">0</span></p>
             </section>
 
-            <!-- SALES HISTORY -->
             <section id="salesHistorySection">
                 <h2>Sales History</h2>
                 <div id="sales"></div>
@@ -216,7 +164,7 @@
     </div>
 
     <script src="admin.js?v=20261107-1"></script>
-    <script src="product-photos.js?v=20261107-1"></script>
+    <script src="product-photos.js?v=20261107-2"></script>
 
 </body>
 </html>
