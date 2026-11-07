@@ -5,6 +5,7 @@
    SALES + SHOP EXPENSES
    DAILY + MONTHLY FINANCIAL REPORTS
    SERVICE MANAGEMENT
+   COMPLETED ORDER DELETION
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -337,15 +338,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
             card.append(heading, phone, service, details, status);
 
-            if (order.status !== "Completed") {
+            if (order.status === "Completed") {
+                const completed = document.createElement("p");
+                completed.textContent = "Order completed!";
+                card.appendChild(completed);
+
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.textContent = "Delete Completed Order";
+                deleteButton.onclick = () => deleteCompletedOrder(order.id);
+                card.appendChild(deleteButton);
+
+            } else {
                 const button = document.createElement("button");
                 button.textContent = "Mark as Completed";
                 button.onclick = () => completeOrder(order.id);
                 card.appendChild(button);
-            } else {
-                const completed = document.createElement("p");
-                completed.textContent = "Order completed!";
-                card.appendChild(completed);
             }
 
             container.appendChild(card);
@@ -362,6 +370,25 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
+        await loadOrders();
+    }
+
+    async function deleteCompletedOrder(orderId) {
+        if (!confirm(
+            "Delete this completed order permanently? Sales history will remain."
+        )) return;
+
+        const { error } = await db.from("orders")
+            .delete()
+            .eq("id", orderId)
+            .eq("status", "Completed");
+
+        if (error) {
+            alert("Could not delete order: " + error.message);
+            return;
+        }
+
+        alert("Completed order deleted. Sales history remains unchanged.");
         await loadOrders();
     }
 
