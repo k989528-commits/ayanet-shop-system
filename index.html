@@ -60,6 +60,9 @@ textarea{min-height:100px;resize:vertical}
 .submit-order{width:100%;padding:15px;margin-top:22px;font-size:16px}
 #selectedPrice{color:#137547;font-weight:bold;margin-top:10px}
 #message{text-align:center;font-weight:bold;line-height:1.5;margin-top:18px}
+.printing-fields{display:none;background:#f3f6fb;border:1px solid #dbe3ef;padding:15px;border-radius:9px;margin-top:15px}
+.printing-fields.visible{display:block}
+.printing-fields p{font-size:13px;color:#64748b;line-height:1.5;margin-bottom:8px}
 button:disabled{opacity:.6;cursor:not-allowed}
 footer{background:#102b50;color:white;text-align:center;padding:25px 15px;line-height:1.8}
 footer strong{color:#f4c542}
@@ -114,6 +117,23 @@ footer strong{color:#f4c542}
 
 <p id="selectedPrice"></p>
 
+<div id="printingFields" class="printing-fields">
+<strong style="color:#102b50">PRINTING DOCUMENT DETAILS</strong>
+<p>Upload your document in PDF or Word format. Maximum file size: 10 MB.</p>
+
+<label for="printingDocument">Choose Your Document</label>
+<input type="file" id="printingDocument" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+
+<label for="printType">Printing Type</label>
+<select id="printType">
+<option value="Black and White">Black and White</option>
+<option value="Colour">Colour</option>
+</select>
+
+<label for="printCopies">Number of Copies</label>
+<input type="number" id="printCopies" min="1" max="500" value="1">
+</div>
+
 <label for="orderDetails">Order Details</label>
 <textarea id="orderDetails" placeholder="Additional instructions or details..." required></textarea>
 
@@ -147,9 +167,17 @@ const form=document.getElementById("orderForm");
 const button=document.getElementById("submitButton");
 const message=document.getElementById("message");
 
+const printingFields=document.getElementById("printingFields");
+const printingDocument=document.getElementById("printingDocument");
+const printType=document.getElementById("printType");
+const printCopies=document.getElementById("printCopies");
+
 let availableServices=[];
 let availableProducts=[];
 let cart=[];
+
+const MAX_FILE_SIZE=10*1024*1024;
+const STORAGE_BUCKET="printing-documents";
 
 function money(value){
 return Number(value||0).toFixed(2);
@@ -158,6 +186,35 @@ return Number(value||0).toFixed(2);
 function showMessage(text,color){
 message.style.color=color;
 message.textContent=text;
+}
+
+function isPrintingService(service){
+if(!service)return false;
+
+return (
+String(service.category||"").toLowerCase().includes("print")||
+String(service.service_name||"").toLowerCase().includes("print")
+);
+}
+
+function updatePrintingFields(){
+const service=availableServices.find(
+item=>String(item.id)===serviceSelect.value
+);
+
+const printing=isPrintingService(service);
+
+printingFields.classList.toggle("visible",printing);
+printingDocument.required=printing;
+}
+
+function validPrintingFile(file){
+
+if(!file)return false;
+
+const extension=file.name.split(".").pop().toLowerCase();
+
+return ["pdf","doc","docx"].includes(extension);
 }
 
 async function loadServices(){
@@ -246,7 +303,7 @@ choose.textContent="Choose This Service";
 
 choose.addEventListener("click",()=>{
 serviceSelect.value=service.id;
-selectedPrice.textContent="Customer Price: KSh "+money(service.price);
+serviceSelect.dispatchEvent(new Event("change"));
 document.getElementById("orderDetails").focus();
 document.querySelector(".order-section").scrollIntoView({behavior:"smooth"});
 });
@@ -428,6 +485,8 @@ const service=availableServices.find(item=>String(item.id)===this.value);
 
 selectedPrice.textContent=service?
 "Customer Price: KSh "+money(service.price):"";
+
+updatePrintingFields();
 });
 
 form.addEventListener("submit",async function(event){
@@ -435,9 +494,15 @@ form.addEventListener("submit",async function(event){
 event.preventDefault();
 
 const selected=availableServices.find(item=>String(item.id)===serviceSelect.value);
+const printing=isPrintingService(selected);
 
 if(!selected&&cart.length===0){
 showMessage("Please select a service or add a product to your cart.","red");
+return;
+}
+
+if(printing&&cart.length>0){
+showMessage("Please submit your printing order separately from products in your shopping cart.","red");
 return;
 }
 
@@ -450,15 +515,50 @@ showMessage("Please complete all required fields.","red");
 return;
 }
 
+let file=null;
+
+if(printing){
+
+file=printingDocument.files[0];
+
+if(!file){
+showMessage("Please choose your printing document.","red");
+return;
+}
+
+if(!validPrintingFile(file)){
+showMessage("Please upload a PDF or Word document only.","red");
+return;
+}
+
+if(file.size>MAX_FILE_SIZE){
+showMessage("Your document is larger than 10 MB. Please choose a smaller file.","red");
+return;
+}
+
+const copies=Number(printCopies.value);
+
+if(!Number.isInteger(copies)||copies<1||copies>500){
+showMessage("Please enter between 1 and 500 copies.","red");
+return;
+}
+}
+
 button.disabled=true;
 button.textContent="SUBMITTING...";
 showMessage("","");
 
 let orderDescription="";
+let uploadedPath=null;
 
 if(selected){
 orderDescription+="SERVICE: "+selected.category+" - "+selected.service_name+
 " | Price: KSh "+money(selected.price)+"\n";
+}
+
+if(printing){
+orderDescription+="PRINT TYPE: "+printType.value+"\n";
+orderDescription+="NUMBER OF COPIES: "+printCopies.value+"\n";
 }
 
 if(cart.length){
@@ -481,10 +581,6 @@ try{
 
 if(cart.length){
 
-// PRODUCT CHECKOUT:
-// Saves the order, deducts stock and records sales
-// together inside the secure Supabase function.
-
 const {data,error}=await db.rpc("place_product_order",{
 p_customer_name:name,
 p_customer_phone:phone,
@@ -504,18 +600,40 @@ console.log("AYANET product order number:",data);
 
 }else{
 
-// SERVICE-ONLY CHECKOUT:
-// Keep the existing service ordering process.
+if(printing){
 
-const {error}=await db
-.from("orders")
-.insert([{
+const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
+const uniqueName=Date.now()+"_"+Math.random().toString(36).slice(2,10)+"_"+safeName;
+
+uploadedPath="customer-uploads/"+uniqueName;
+
+const {error:uploadError}=await db.storage
+.from(STORAGE_BUCKET)
+.upload(uploadedPath,file,{
+cacheControl:"3600",
+upsert:false,
+contentType:file.type||"application/octet-stream"
+});
+
+if(uploadError)throw uploadError;
+}
+
+const orderRecord={
 customer_name:name,
 customer_phone:phone,
 service_name:selected.category+" - "+selected.service_name+
 " (KSh "+money(selected.price)+")",
 order_details:orderDescription
-}]);
+};
+
+if(printing){
+orderRecord.document_url=uploadedPath;
+orderRecord.document_name=file.name;
+}
+
+const {error}=await db
+.from("orders")
+.insert([orderRecord]);
 
 if(error)throw error;
 
@@ -530,13 +648,24 @@ form.reset();
 cart=[];
 renderCart();
 selectedPrice.textContent="";
+printingFields.classList.remove("visible");
+printingDocument.required=false;
 
-// Reload the product list to show the new stock quantities.
 await loadProducts();
 
 }catch(error){
 
 console.error("AYANET checkout error:",error);
+
+if(uploadedPath){
+const {error:removeError}=await db.storage
+.from(STORAGE_BUCKET)
+.remove([uploadedPath]);
+
+if(removeError){
+console.error("Could not remove unused uploaded document:",removeError);
+}
+}
 
 showMessage(
 "Sorry, your order could not be submitted. "+(error.message||"Please try again."),
