@@ -6,19 +6,21 @@ document.addEventListener("DOMContentLoaded", function () {
     );
 
     const form = document.getElementById("productForm");
-    const products = document.getElementById("products");
+    const productList = document.getElementById("products");
     const message = document.getElementById("productMessage");
 
-    if (!form || !products) return;
+    if (!form || !productList || !message) return;
 
-    // Create the photo chooser
-    const photoLabel = document.createElement("label");
-    photoLabel.textContent = "Product Photo (optional)";
+    // PHOTO SELECTION
+    const label = document.createElement("label");
+    label.textContent = "Choose Product Photo";
 
     const photoInput = document.createElement("input");
     photoInput.type = "file";
     photoInput.accept = "image/jpeg,image/png,image/webp";
     photoInput.id = "productPhoto";
+    photoInput.style.display = "block";
+    photoInput.style.margin = "10px 0";
 
     const preview = document.createElement("img");
     preview.style.display = "none";
@@ -26,23 +28,30 @@ document.addEventListener("DOMContentLoaded", function () {
     preview.style.maxHeight = "160px";
     preview.style.objectFit = "contain";
 
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (!submitButton) return;
+
+    form.insertBefore(label, submitButton);
+    form.insertBefore(photoInput, submitButton);
+    form.insertBefore(preview, submitButton);
+
     photoInput.addEventListener("change", function () {
         const file = photoInput.files[0];
 
-        if (!file) {
-            preview.style.display = "none";
-            return;
-        }
+        if (!file) return;
 
         if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
             alert("Choose a JPG, PNG or WEBP photo.");
             photoInput.value = "";
+            preview.style.display = "none";
             return;
         }
 
         if (file.size > 5 * 1024 * 1024) {
             alert("Photo must be 5 MB or smaller.");
             photoInput.value = "";
+            preview.style.display = "none";
             return;
         }
 
@@ -50,22 +59,13 @@ document.addEventListener("DOMContentLoaded", function () {
         preview.style.display = "block";
     });
 
-    const submitButton = form.querySelector('button[type="submit"]');
-
-    form.insertBefore(photoLabel, submitButton);
-    form.insertBefore(photoInput, submitButton);
-    form.insertBefore(preview, submitButton);
-
+    // UPLOAD PHOTO TO SUPABASE
     async function uploadPhoto(file) {
         const extension = {
             "image/jpeg": "jpg",
             "image/png": "png",
             "image/webp": "webp"
         }[file.type];
-
-        if (!extension) {
-            throw new Error("Unsupported photo format.");
-        }
 
         const filename =
             Date.now() + "-" +
@@ -88,7 +88,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return data.publicUrl;
     }
 
-    // Handle adding products with photos
+    // SAVE PRODUCT WITH ITS PHOTO
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -103,15 +103,9 @@ document.addEventListener("DOMContentLoaded", function () {
         const stock =
             Number(document.getElementById("productStock").value);
 
-        if (
-            !name ||
-            !Number.isFinite(costPrice) ||
-            !Number.isFinite(price) ||
-            costPrice <= 0 ||
-            price <= 0 ||
-            stock < 0 ||
-            !Number.isInteger(stock)
-        ) {
+        if (!name || !Number.isFinite(costPrice) ||
+            !Number.isFinite(price) || costPrice <= 0 ||
+            price <= 0 || stock < 0 || !Number.isInteger(stock)) {
             message.textContent = "Please enter valid product details.";
             return;
         }
@@ -127,17 +121,16 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         submitButton.disabled = true;
-        message.textContent = "Saving product...";
 
         try {
             let imageUrl = null;
 
             if (file) {
-                message.textContent = "Uploading product photo...";
+                message.textContent = "Uploading photo...";
                 imageUrl = await uploadPhoto(file);
             }
 
-            message.textContent = "Adding product...";
+            message.textContent = "Saving product...";
 
             const { error } = await db.from("products").insert([{
                 name,
@@ -151,11 +144,12 @@ document.addEventListener("DOMContentLoaded", function () {
             if (error) throw error;
 
             message.textContent = "Product and photo saved successfully!";
+
             form.reset();
             preview.removeAttribute("src");
             preview.style.display = "none";
 
-            setTimeout(() => window.location.reload(), 1000);
+            window.location.reload();
 
         } catch (error) {
             message.textContent = "Could not save product: " + error.message;
@@ -163,98 +157,4 @@ document.addEventListener("DOMContentLoaded", function () {
             submitButton.disabled = false;
         }
     }, true);
-
-    // Add photo previews and photo-change buttons to existing products
-    async function addPhotoTools(card) {
-        if (card.dataset.photoTools === "yes") return;
-
-        const heading = card.querySelector("h3");
-        if (!heading) return;
-
-        const productName = heading.textContent.trim();
-
-        const { data, error } = await db
-            .from("products")
-            .select("id,image_url")
-            .eq("name", productName)
-            .maybeSingle();
-
-        if (error || !data || !card.isConnected) return;
-
-        card.dataset.photoTools = "yes";
-
-        if (data.image_url) {
-            const image = document.createElement("img");
-            image.src = data.image_url;
-            image.alt = productName;
-            image.style.maxWidth = "150px";
-            image.style.maxHeight = "150px";
-            image.style.objectFit = "contain";
-            image.style.display = "block";
-            image.style.marginBottom = "10px";
-            card.insertBefore(image, card.firstChild);
-        }
-
-        const changeButton = document.createElement("button");
-        changeButton.type = "button";
-        changeButton.textContent =
-            data.image_url ? "Change Product Photo" : "Add Product Photo";
-
-        const changeInput = document.createElement("input");
-        changeInput.type = "file";
-        changeInput.accept = "image/jpeg,image/png,image/webp";
-        changeInput.style.display = "none";
-
-        changeButton.addEventListener("click", () => changeInput.click());
-
-        changeInput.addEventListener("change", async function () {
-            const file = changeInput.files[0];
-            if (!file) return;
-
-            if (
-                !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
-                file.size > 5 * 1024 * 1024
-            ) {
-                alert("Choose a JPG, PNG or WEBP photo of 5 MB or less.");
-                changeInput.value = "";
-                return;
-            }
-
-            changeButton.disabled = true;
-            changeButton.textContent = "Uploading...";
-
-            try {
-                const imageUrl = await uploadPhoto(file);
-
-                const { error: updateError } = await db
-                    .from("products")
-                    .update({ image_url: imageUrl })
-                    .eq("id", data.id);
-
-                if (updateError) throw updateError;
-
-                alert("Product photo updated successfully!");
-                window.location.reload();
-
-            } catch (error) {
-                alert("Photo update failed: " + error.message);
-                changeButton.disabled = false;
-                changeButton.textContent = "Try Again";
-            }
-        });
-
-        card.append(changeButton, changeInput);
-    }
-
-    const observer = new MutationObserver(() => {
-        products.querySelectorAll(".product-card").forEach(card => {
-            addPhotoTools(card);
-        });
-    });
-
-    observer.observe(products, { childList: true });
-
-    products.querySelectorAll(".product-card").forEach(card => {
-        addPhotoTools(card);
-    });
 });
