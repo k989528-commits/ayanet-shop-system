@@ -1,3 +1,4 @@
+
 /* =====================================
    AYANET ADMIN DASHBOARD
    PRODUCTS + BUYING COST + SELLING PRICE
@@ -6,6 +7,7 @@
    DAILY + MONTHLY FINANCIAL REPORTS
    SERVICE MANAGEMENT
    COMPLETED ORDER DELETION
+   PRINTING DOCUMENT VIEW / DOWNLOAD
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -18,6 +20,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const get = id => document.getElementById(id);
     const LOW_STOCK_LEVEL = 20;
     const SHOP_TIMEZONE = "Africa/Nairobi";
+    const STORAGE_BUCKET = "printing-documents";
 
     function money(value) {
         return Number(value || 0).toFixed(2);
@@ -298,6 +301,50 @@ document.addEventListener("DOMContentLoaded", function () {
     // CUSTOMER ORDERS
     // =====================================
 
+    async function openPrintingDocument(order, button) {
+        if (!order.document_url) {
+            alert("No printing document is attached to this order.");
+            return;
+        }
+
+        const originalText = button.textContent;
+        button.disabled = true;
+        button.textContent = "Preparing document...";
+
+        try {
+            const { data, error } = await db.storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(
+                    order.document_url,
+                    300,
+                    { download: order.document_name || true }
+                );
+
+            if (error) throw error;
+
+            if (!data || !data.signedUrl) {
+                throw new Error("Could not create a secure document link.");
+            }
+
+            const link = document.createElement("a");
+            link.href = data.signedUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.download = order.document_name || "";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+        } catch (error) {
+            console.error("Document access error:", error);
+            alert("Could not open document: " + error.message);
+
+        } finally {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
     async function loadOrders() {
         const container = get("orders");
 
@@ -337,6 +384,22 @@ document.addEventListener("DOMContentLoaded", function () {
             status.textContent = "Status: " + (order.status || "Pending");
 
             card.append(heading, phone, service, details, status);
+
+            if (order.document_url) {
+                const documentInfo = document.createElement("p");
+                documentInfo.textContent =
+                    "Printing document: " +
+                    (order.document_name || "Customer document");
+
+                const documentButton = document.createElement("button");
+                documentButton.type = "button";
+                documentButton.textContent = "View / Download Document";
+                documentButton.addEventListener("click", function () {
+                    openPrintingDocument(order, documentButton);
+                });
+
+                card.append(documentInfo, documentButton);
+            }
 
             if (order.status === "Completed") {
                 const completed = document.createElement("p");
