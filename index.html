@@ -1,617 +1,508 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYANET | Your One Stop Shop</title>
+<meta name="description" content="Shop products and order services from AYANET.">
+<meta name="theme-color" content="#102b50">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./admin/icon-192.png">
 
-    <title>AYANET | Your One Stop Shop</title>
-    <meta name="description" content="Welcome to AYANET. Shop products and order printing, photocopying, online applications, phone repair and more.">
-    <meta name="theme-color" content="#102b50">
-
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" href="./admin/icon-192.png">
-
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: Arial, sans-serif;
-            background: #f3f6fb;
-            color: #263449;
-        }
-
-        header {
-            background: #102b50;
-            color: white;
-            padding: 20px 7%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        header h1 {
-            color: #f4c542;
-            font-size: 28px;
-        }
-
-        header a {
-            color: white;
-            text-decoration: none;
-            border: 1px solid #f4c542;
-            padding: 10px 17px;
-            border-radius: 7px;
-        }
-
-        .hero {
-            background: #102b50;
-            color: white;
-            text-align: center;
-            padding: 65px 20px;
-        }
-
-        .hero h2 {
-            color: #f4c542;
-            font-size: 36px;
-            margin-bottom: 15px;
-        }
-
-        .hero p {
-            font-size: 17px;
-            line-height: 1.7;
-        }
-
-        .section {
-            max-width: 1050px;
-            margin: auto;
-            padding: 45px 20px;
-        }
-
-        .section h2 {
-            text-align: center;
-            color: #102b50;
-            margin-bottom: 25px;
-            font-size: 27px;
-        }
-
-        .services {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 18px;
-        }
-
-        .service {
-            background: white;
-            padding: 22px 18px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.06);
-            border-bottom: 3px solid #f4c542;
-        }
-
-        .category-button {
-            width: 100%;
-            background: transparent;
-            color: #102b50;
-            border: none;
-            padding: 0;
-            margin: 0;
-            text-align: center;
-            cursor: pointer;
-        }
-
-        .category-button:hover {
-            background: transparent;
-        }
-
-        .service .symbol {
-            display: block;
-            font-size: 32px;
-            margin-bottom: 12px;
-        }
-
-        .service h3 {
-            color: #102b50;
-            margin-bottom: 9px;
-        }
-
-        .service-description {
-            color: #64748b;
-            font-size: 14px;
-            line-height: 1.5;
-            text-align: center;
-            margin-top: 8px;
-        }
-
-        .subcategory-list {
-            display: none;
-            margin-top: 18px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 12px;
-        }
-
-        .subcategory-list.open {
-            display: block;
-        }
-
-        .subcategory {
-            padding: 12px 0;
-            border-bottom: 1px solid #e2e8f0;
-        }
-
-        .subcategory h4 {
-            color: #102b50;
-            margin-bottom: 6px;
-        }
-
-        .subcategory p {
-            color: #64748b;
-            font-size: 13px;
-            line-height: 1.5;
-            margin-bottom: 7px;
-        }
-
-        .service-price {
-            color: #137547;
-            font-weight: bold;
-            margin-bottom: 8px;
-        }
-
-        .choose-service {
-            width: 100%;
-            background: #102b50;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            padding: 9px;
-            margin-top: 5px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .choose-service:hover {
-            background: #1d4779;
-        }
-
-        #servicesMessage {
-            text-align: center;
-            color: #64748b;
-            padding: 15px;
-            line-height: 1.6;
-        }
-
-        .order-section {
-            max-width: 650px;
-            margin: 10px auto 50px;
-            padding: 30px 22px;
-            background: white;
-            border-radius: 14px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.07);
-        }
-
-        .order-section h2 {
-            color: #102b50;
-            text-align: center;
-            margin-bottom: 12px;
-        }
-
-        .order-section > p {
-            text-align: center;
-            color: #64748b;
-            margin-bottom: 25px;
-        }
-
-        label {
-            display: block;
-            font-weight: bold;
-            margin: 17px 0 7px;
-            color: #102b50;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 13px;
-            border: 1px solid #cbd5e1;
-            border-radius: 7px;
-            font-size: 15px;
-            font-family: Arial, sans-serif;
-        }
-
-        textarea {
-            min-height: 110px;
-            resize: vertical;
-        }
-
-        button.submit-order {
-            width: 100%;
-            background: #102b50;
-            color: white;
-            padding: 15px;
-            border: none;
-            border-radius: 7px;
-            margin-top: 22px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        button.submit-order:hover {
-            background: #1d4779;
-        }
-
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-
-        #selectedPrice {
-            color: #137547;
-            font-weight: bold;
-            margin-top: 10px;
-        }
-
-        #message {
-            margin-top: 18px;
-            text-align: center;
-            font-weight: bold;
-            line-height: 1.5;
-        }
-
-        footer {
-            background: #102b50;
-            color: white;
-            text-align: center;
-            padding: 25px 15px;
-            line-height: 1.8;
-        }
-
-        footer strong {
-            color: #f4c542;
-        }
-    </style>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f3f6fb;color:#263449}
+header{background:#102b50;color:white;padding:20px 7%;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}
+header h1{color:#f4c542;font-size:28px}
+header a{color:white;text-decoration:none;border:1px solid #f4c542;padding:10px 17px;border-radius:7px}
+.hero{background:#102b50;color:white;text-align:center;padding:55px 20px}
+.hero h2{color:#f4c542;font-size:36px;margin-bottom:15px}
+.hero p{font-size:17px;line-height:1.7}
+.section{max-width:1100px;margin:auto;padding:40px 20px}
+.section h2{text-align:center;color:#102b50;margin-bottom:25px;font-size:27px}
+.services,.products{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+.service,.product,.cart-box{background:white;padding:20px;border-radius:12px;box-shadow:0 4px 15px rgba(0,0,0,.06);border-bottom:3px solid #f4c542}
+.category-button{width:100%;background:transparent;color:#102b50;border:0;padding:0;text-align:center;cursor:pointer}
+.category-button:hover{background:transparent}
+.symbol{display:block;font-size:32px;margin-bottom:12px}
+.service h3,.product h3{color:#102b50;margin-bottom:9px}
+.service-description{color:#64748b;font-size:14px;line-height:1.5;text-align:center;margin-top:8px}
+.subcategory-list{display:none;margin-top:18px;border-top:1px solid #e2e8f0;padding-top:12px}
+.subcategory-list.open{display:block}
+.subcategory{padding:12px 0;border-bottom:1px solid #e2e8f0}
+.subcategory h4{color:#102b50;margin-bottom:6px}
+.subcategory p{color:#64748b;font-size:13px;line-height:1.5;margin-bottom:7px}
+.service-price,.product-price{color:#137547;font-weight:bold;margin:10px 0}
+button{cursor:pointer}
+.choose-service,.add-cart,.cart-button,.submit-order,.quantity-button,.remove-button{
+background:#102b50;color:white;border:0;border-radius:6px;padding:10px;font-weight:bold
+}
+.choose-service{width:100%;margin-top:5px}
+button:hover{background:#1d4779}
+.product img{width:100%;height:160px;object-fit:contain;background:#f3f6fb;border-radius:8px;margin-bottom:12px}
+.product .placeholder{height:160px;background:#edf1f7;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:55px;margin-bottom:12px}
+.product p{font-size:14px;line-height:1.5;color:#64748b}
+.add-cart{width:100%;margin-top:12px}
+.cart-box{max-width:850px;margin:10px auto 30px}
+.cart-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap}
+.cart-item strong{color:#102b50}
+.quantity-button,.remove-button{padding:6px 10px;margin:2px}
+.remove-button{background:#a83232}
+.cart-total{font-size:20px;font-weight:bold;color:#137547;text-align:right;margin-top:18px}
+.empty-cart{text-align:center;color:#64748b;padding:15px}
+.order-section{max-width:650px;margin:10px auto 50px;padding:30px 22px;background:white;border-radius:14px;box-shadow:0 5px 20px rgba(0,0,0,.07)}
+.order-section h2{color:#102b50;text-align:center;margin-bottom:12px}
+.order-section>p{text-align:center;color:#64748b;margin-bottom:25px}
+label{display:block;font-weight:bold;margin:17px 0 7px;color:#102b50}
+input,select,textarea{width:100%;padding:13px;border:1px solid #cbd5e1;border-radius:7px;font-size:15px;font-family:Arial,sans-serif}
+textarea{min-height:100px;resize:vertical}
+.submit-order{width:100%;padding:15px;margin-top:22px;font-size:16px}
+#selectedPrice{color:#137547;font-weight:bold;margin-top:10px}
+#message{text-align:center;font-weight:bold;line-height:1.5;margin-top:18px}
+button:disabled{opacity:.6;cursor:not-allowed}
+footer{background:#102b50;color:white;text-align:center;padding:25px 15px;line-height:1.8}
+footer strong{color:#f4c542}
+</style>
 </head>
 
 <body>
-
 <header>
-    <h1>AYANET</h1>
-    <a href="./admin/dashboard.html">Admin Login</a>
+<h1>AYANET</h1>
+<a href="./admin/dashboard.html">Admin Login</a>
 </header>
 
 <section class="hero">
-    <h2>WELCOME TO AYANET</h2>
-    <p>Your One Stop Shop – Learn, Work and Grow.</p>
-    <p>Order our services from the comfort of your home.</p>
+<h2>WELCOME TO AYANET</h2>
+<p>Your One Stop Shop – Learn, Work and Grow.</p>
+<p>Shop our products and order our services from the comfort of your home.</p>
 </section>
 
 <section class="section">
-    <h2>OUR SERVICES</h2>
-    <div id="services" class="services">
-        <p id="servicesMessage">Loading our services...</p>
-    </div>
+<h2>OUR SERVICES</h2>
+<div id="services" class="services">Loading services...</div>
+</section>
+
+<section class="section">
+<h2>OUR PRODUCTS</h2>
+<div id="products" class="products">Loading products...</div>
+</section>
+
+<section class="section">
+<h2>MY SHOPPING CART</h2>
+<div class="cart-box">
+<div id="cartItems"><p class="empty-cart">Your shopping cart is empty.</p></div>
+<div class="cart-total" id="cartTotal">Total: KSh 0.00</div>
+</div>
 </section>
 
 <section class="order-section">
+<h2>PLACE YOUR ORDER</h2>
+<p>Enter your details to submit your order.</p>
 
-    <h2>PLACE YOUR ORDER</h2>
-    <p>Choose a service and tell us what you need.</p>
+<form id="orderForm">
+<label for="customerName">Your Full Name</label>
+<input type="text" id="customerName" placeholder="Enter your name" required>
 
-    <form id="orderForm">
+<label for="customerPhone">Phone Number</label>
+<input type="tel" id="customerPhone" placeholder="Enter your phone number" required>
 
-        <label for="customerName">Your Full Name</label>
-        <input
-            type="text"
-            id="customerName"
-            placeholder="Enter your name"
-            required
-        >
+<label for="serviceName">Select a Service (Optional)</label>
+<select id="serviceName">
+<option value="">-- No service selected --</option>
+</select>
 
-        <label for="customerPhone">Phone Number</label>
-        <input
-            type="tel"
-            id="customerPhone"
-            placeholder="Enter your phone number"
-            required
-        >
+<p id="selectedPrice"></p>
 
-        <label for="serviceName">Select a Service</label>
-        <select id="serviceName" required>
-            <option value="">-- Choose a Service --</option>
-        </select>
+<label for="orderDetails">Order Details</label>
+<textarea id="orderDetails" placeholder="Additional instructions or details..." required></textarea>
 
-        <p id="selectedPrice"></p>
-
-        <label for="orderDetails">Order Details</label>
-        <textarea
-            id="orderDetails"
-            placeholder="Describe what you need..."
-            required
-        ></textarea>
-
-        <button type="submit" id="submitButton" class="submit-order">
-            SUBMIT ORDER
-        </button>
-
-        <div id="message" role="status"></div>
-
-    </form>
-
+<button type="submit" id="submitButton" class="submit-order">SUBMIT ORDER</button>
+<div id="message" role="status"></div>
+</form>
 </section>
 
 <footer>
-    <strong>AYANET</strong><br>
-    Your One Stop Shop – Learn, Work and Grow.<br>
-    AYANET Shop Management &copy; 2026
+<strong>AYANET</strong><br>
+Your One Stop Shop – Learn, Work and Grow.<br>
+AYANET Shop Management &copy; 2026
 </footer>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-
-    const db = window.supabase.createClient(
-        "https://jltadhukraspfdaxbvwo.supabase.co",
-        "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
-    );
-
-    const servicesContainer = document.getElementById("services");
-    const serviceSelect = document.getElementById("serviceName");
-    const selectedPrice = document.getElementById("selectedPrice");
-    const form = document.getElementById("orderForm");
-    const button = document.getElementById("submitButton");
-    const message = document.getElementById("message");
-
-    let availableServices = [];
-
-    const categoryIcons = {
-        "printing": "🖨️",
-        "photocopy & scanning": "📄",
-        "online applications": "💻",
-        "cv writing & typing": "📝",
-        "books & stationery": "📚",
-        "phone repair": "📱"
-    };
-
-    function money(value) {
-        return Number(value || 0).toFixed(2);
-    }
-
-    function addServiceToOrder(service) {
-        serviceSelect.value = service.id;
-        selectedPrice.textContent =
-            "Customer Price: KSh " + money(service.price);
-
-        document.getElementById("orderDetails").focus();
-
-        document.querySelector(".order-section").scrollIntoView({
-            behavior: "smooth"
-        });
-    }
-
-    async function loadCustomerServices() {
-
-        servicesContainer.innerHTML =
-            "<p id='servicesMessage'>Loading our services...</p>";
-
-        const { data, error } = await db
-            .from("services")
-            .select("id, category, service_name, description, price")
-            .eq("is_active", true)
-            .order("category")
-            .order("service_name");
-
-        if (error) {
-            servicesContainer.innerHTML = "";
-            const errorMessage = document.createElement("p");
-            errorMessage.id = "servicesMessage";
-            errorMessage.textContent =
-                "We could not load services. Please refresh the page.";
-            servicesContainer.appendChild(errorMessage);
-            console.error("Service loading error:", error);
-            return;
-        }
-
-        availableServices = data || [];
-
-        serviceSelect.innerHTML = "";
-
-        const firstOption = document.createElement("option");
-        firstOption.value = "";
-        firstOption.textContent = "-- Choose a Service --";
-        serviceSelect.appendChild(firstOption);
-
-        servicesContainer.innerHTML = "";
-
-        if (availableServices.length === 0) {
-            const emptyMessage = document.createElement("p");
-            emptyMessage.id = "servicesMessage";
-            emptyMessage.textContent =
-                "Our services are being updated. Please check again soon.";
-            servicesContainer.appendChild(emptyMessage);
-            return;
-        }
-
-        const categories = {};
-
-        availableServices.forEach(service => {
-            const category = service.category || "Other";
-
-            if (!categories[category]) {
-                categories[category] = [];
-            }
-
-            categories[category].push(service);
-
-            const option = document.createElement("option");
-            option.value = service.id;
-            option.textContent =
-                category + " - " + service.service_name +
-                " (KSh " + money(service.price) + ")";
-
-            serviceSelect.appendChild(option);
-        });
-
-        Object.keys(categories).forEach(category => {
-
-            const card = document.createElement("div");
-            card.className = "service";
-
-            const icon = document.createElement("span");
-            icon.className = "symbol";
-            icon.textContent =
-                categoryIcons[category.toLowerCase()] || "🛍️";
-
-            const categoryButton = document.createElement("button");
-            categoryButton.type = "button";
-            categoryButton.className = "category-button";
-
-            const heading = document.createElement("h3");
-            heading.textContent = category;
-
-            const description = document.createElement("p");
-            description.className = "service-description";
-            description.textContent =
-                "Click to view available services and prices.";
-
-            categoryButton.append(icon, heading, description);
-
-            const subcategoryList = document.createElement("div");
-            subcategoryList.className = "subcategory-list";
-
-            categoryButton.addEventListener("click", function () {
-                subcategoryList.classList.toggle("open");
-            });
-
-            categories[category].forEach(service => {
-
-                const item = document.createElement("div");
-                item.className = "subcategory";
-
-                const name = document.createElement("h4");
-                name.textContent = service.service_name;
-
-                const details = document.createElement("p");
-                details.textContent =
-                    service.description || "AYANET quality service.";
-
-                const price = document.createElement("p");
-                price.className = "service-price";
-                price.textContent =
-                    "KSh " + money(service.price);
-
-                const chooseButton = document.createElement("button");
-                chooseButton.type = "button";
-                chooseButton.className = "choose-service";
-                chooseButton.textContent = "Choose This Service";
-
-                chooseButton.addEventListener("click", function () {
-                    addServiceToOrder(service);
-                });
-
-                item.append(name, details, price, chooseButton);
-                subcategoryList.appendChild(item);
-            });
-
-            card.append(categoryButton, subcategoryList);
-            servicesContainer.appendChild(card);
-        });
-    }
-
-    serviceSelect.addEventListener("change", function () {
-
-        const selected = availableServices.find(
-            service => String(service.id) === this.value
-        );
-
-        selectedPrice.textContent = selected
-            ? "Customer Price: KSh " + money(selected.price)
-            : "";
-    });
-
-    form.addEventListener("submit", async function (event) {
-
-        event.preventDefault();
-
-        const selected = availableServices.find(
-            service => String(service.id) === serviceSelect.value
-        );
-
-        if (!selected) {
-            message.style.color = "red";
-            message.textContent = "Please select an available service.";
-            return;
-        }
-
-        button.disabled = true;
-        button.textContent = "SUBMITTING...";
-        message.textContent = "";
-
-        const order = {
-            customer_name:
-                document.getElementById("customerName").value.trim(),
-
-            customer_phone:
-                document.getElementById("customerPhone").value.trim(),
-
-            service_name:
-                selected.category + " - " + selected.service_name +
-                " (KSh " + money(selected.price) + ")",
-
-            order_details:
-                document.getElementById("orderDetails").value.trim()
-        };
-
-        try {
-
-            const { error } = await db
-                .from("orders")
-                .insert([order]);
-
-            if (error) {
-                throw error;
-            }
-
-            message.style.color = "green";
-            message.textContent =
-                "Your order has been submitted successfully! Thank you for choosing AYANET.";
-
-            form.reset();
-            selectedPrice.textContent = "";
-
-        } catch (error) {
-
-            console.error("AYANET order error:", error);
-
-            message.style.color = "red";
-            message.textContent =
-                "Sorry, your order could not be submitted. Please try again or contact AYANET.";
-
-        } finally {
-
-            button.disabled = false;
-            button.textContent = "SUBMIT ORDER";
-
-        }
-
-    });
-
-    loadCustomerServices();
-
-    if ("serviceWorker" in navigator) {
-        window.addEventListener("load", function () {
-            navigator.serviceWorker.register("./service-worker.js")
-                .catch(function (error) {
-                    console.error("Service worker error:", error);
-                });
-        });
-    }
+document.addEventListener("DOMContentLoaded",function(){
+
+const db=window.supabase.createClient(
+"https://jltadhukraspfdaxbvwo.supabase.co",
+"sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
+);
+
+const servicesContainer=document.getElementById("services");
+const productsContainer=document.getElementById("products");
+const serviceSelect=document.getElementById("serviceName");
+const selectedPrice=document.getElementById("selectedPrice");
+const cartItems=document.getElementById("cartItems");
+const cartTotal=document.getElementById("cartTotal");
+const form=document.getElementById("orderForm");
+const button=document.getElementById("submitButton");
+const message=document.getElementById("message");
+
+let availableServices=[];
+let availableProducts=[];
+let cart=[];
+
+function money(value){
+return Number(value||0).toFixed(2);
+}
+
+function showMessage(text,color){
+message.style.color=color;
+message.textContent=text;
+}
+
+async function loadServices(){
+
+const {data,error}=await db
+.from("services")
+.select("id,category,service_name,description,price")
+.eq("is_active",true)
+.order("category")
+.order("service_name");
+
+if(error){
+servicesContainer.textContent="Could not load services. Please refresh.";
+console.error(error);
+return;
+}
+
+availableServices=data||[];
+serviceSelect.innerHTML='<option value="">-- No service selected --</option>';
+servicesContainer.innerHTML="";
+
+if(!availableServices.length){
+servicesContainer.textContent="No services currently available.";
+return;
+}
+
+const categories={};
+
+availableServices.forEach(service=>{
+const category=service.category||"Other";
+if(!categories[category])categories[category]=[];
+categories[category].push(service);
+
+const option=document.createElement("option");
+option.value=service.id;
+option.textContent=category+" - "+service.service_name+" (KSh "+money(service.price)+")";
+serviceSelect.appendChild(option);
+});
+
+const icons={
+"printing":"🖨️",
+"photocopy & scanning":"📄",
+"online applications":"💻",
+"cv writing & typing":"📝",
+"books & stationery":"📚",
+"phone repair":"📱"
+};
+
+Object.keys(categories).forEach(category=>{
+const card=document.createElement("div");
+card.className="service";
+
+const heading=document.createElement("h3");
+heading.textContent=(icons[category.toLowerCase()]||"🛍️")+" "+category;
+
+const description=document.createElement("p");
+description.className="service-description";
+description.textContent="Click to view available services and prices.";
+
+const list=document.createElement("div");
+list.className="subcategory-list";
+
+heading.style.cursor="pointer";
+heading.addEventListener("click",()=>list.classList.toggle("open"));
+description.addEventListener("click",()=>list.classList.toggle("open"));
+
+categories[category].forEach(service=>{
+const item=document.createElement("div");
+item.className="subcategory";
+
+const name=document.createElement("h4");
+name.textContent=service.service_name;
+
+const details=document.createElement("p");
+details.textContent=service.description||"AYANET quality service.";
+
+const price=document.createElement("p");
+price.className="service-price";
+price.textContent="KSh "+money(service.price);
+
+const choose=document.createElement("button");
+choose.className="choose-service";
+choose.type="button";
+choose.textContent="Choose This Service";
+choose.addEventListener("click",()=>{
+serviceSelect.value=service.id;
+selectedPrice.textContent="Customer Price: KSh "+money(service.price);
+document.getElementById("orderDetails").focus();
+document.querySelector(".order-section").scrollIntoView({behavior:"smooth"});
+});
+
+item.append(name,details,price,choose);
+list.appendChild(item);
+});
+
+card.append(heading,description,list);
+servicesContainer.appendChild(card);
+});
+}
+
+async function loadProducts(){
+
+const {data,error}=await db
+.from("customer_products")
+.select("id,name,description,price,stock,image_url")
+.gt("stock",0)
+.order("name");
+
+if(error){
+productsContainer.textContent="Could not load products. Please refresh.";
+console.error("Product loading error:",error);
+return;
+}
+
+availableProducts=data||[];
+productsContainer.innerHTML="";
+
+if(!availableProducts.length){
+productsContainer.textContent="No products currently available.";
+return;
+}
+
+availableProducts.forEach(product=>{
+
+const card=document.createElement("div");
+card.className="product";
+
+if(product.image_url){
+const img=document.createElement("img");
+img.src=product.image_url;
+img.alt=product.name;
+img.onerror=()=>{
+img.remove();
+const placeholder=document.createElement("div");
+placeholder.className="placeholder";
+placeholder.textContent="🛍️";
+card.prepend(placeholder);
+};
+card.appendChild(img);
+}else{
+const placeholder=document.createElement("div");
+placeholder.className="placeholder";
+placeholder.textContent="🛍️";
+card.appendChild(placeholder);
+}
+
+const name=document.createElement("h3");
+name.textContent=product.name;
+
+const description=document.createElement("p");
+description.textContent=product.description||"AYANET quality product.";
+
+const price=document.createElement("p");
+price.className="product-price";
+price.textContent="KSh "+money(product.price);
+
+const stock=document.createElement("p");
+stock.textContent="Available stock: "+product.stock;
+
+const add=document.createElement("button");
+add.className="add-cart";
+add.textContent="ADD TO CART";
+add.addEventListener("click",()=>addToCart(product));
+
+card.append(name,description,price,stock,add);
+productsContainer.appendChild(card);
+});
+}
+
+function addToCart(product){
+
+const existing=cart.find(item=>String(item.id)===String(product.id));
+
+if(existing){
+if(existing.quantity>=Number(product.stock)){
+alert("Sorry, no more stock is available.");
+return;
+}
+existing.quantity++;
+}else{
+cart.push({...product,quantity:1});
+}
+
+renderCart();
+}
+
+function renderCart(){
+
+cartItems.innerHTML="";
+
+if(cart.length===0){
+cartItems.innerHTML='<p class="empty-cart">Your shopping cart is empty.</p>';
+}else{
+
+cart.forEach(item=>{
+
+const row=document.createElement("div");
+row.className="cart-item";
+
+const info=document.createElement("div");
+const name=document.createElement("strong");
+name.textContent=item.name;
+
+const amount=document.createElement("p");
+amount.textContent="KSh "+money(item.price)+" each";
+
+info.append(name,amount);
+
+const controls=document.createElement("div");
+
+const minus=document.createElement("button");
+minus.className="quantity-button";
+minus.textContent="−";
+minus.addEventListener("click",()=>{
+item.quantity--;
+if(item.quantity<=0){
+cart=cart.filter(product=>String(product.id)!==String(item.id));
+}
+renderCart();
+});
+
+const quantity=document.createElement("strong");
+quantity.textContent=" "+item.quantity+" ";
+
+const plus=document.createElement("button");
+plus.className="quantity-button";
+plus.textContent="+";
+plus.addEventListener("click",()=>{
+if(item.quantity>=Number(item.stock)){
+alert("Sorry, no more stock is available.");
+return;
+}
+item.quantity++;
+renderCart();
+});
+
+const remove=document.createElement("button");
+remove.className="remove-button";
+remove.textContent="Remove";
+remove.addEventListener("click",()=>{
+cart=cart.filter(product=>String(product.id)!==String(item.id));
+renderCart();
+});
+
+controls.append(minus,quantity,plus,remove);
+row.append(info,controls);
+cartItems.appendChild(row);
+});
+}
+
+const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
+cartTotal.textContent="Total: KSh "+money(total);
+}
+
+serviceSelect.addEventListener("change",function(){
+const service=availableServices.find(item=>String(item.id)===this.value);
+selectedPrice.textContent=service?"Customer Price: KSh "+money(service.price):"";
+});
+
+form.addEventListener("submit",async function(event){
+
+event.preventDefault();
+
+const selected=availableServices.find(item=>String(item.id)===serviceSelect.value);
+
+if(!selected&&cart.length===0){
+showMessage("Please select a service or add a product to your cart.","red");
+return;
+}
+
+const name=document.getElementById("customerName").value.trim();
+const phone=document.getElementById("customerPhone").value.trim();
+const details=document.getElementById("orderDetails").value.trim();
+
+if(!name||!phone||!details){
+showMessage("Please complete all required fields.","red");
+return;
+}
+
+button.disabled=true;
+button.textContent="SUBMITTING...";
+showMessage("","");
+
+let orderDescription="";
+
+if(selected){
+orderDescription+="SERVICE: "+selected.category+" - "+selected.service_name+
+" | Price: KSh "+money(selected.price)+"\n";
+}
+
+if(cart.length){
+orderDescription+="PRODUCTS:\n";
+cart.forEach(item=>{
+orderDescription+=item.name+" x "+item.quantity+
+" @ KSh "+money(item.price)+" = KSh "+
+money(item.price*item.quantity)+"\n";
+});
+const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
+orderDescription+="PRODUCT TOTAL: KSh "+money(total)+"\n";
+}
+
+orderDescription+="CUSTOMER DETAILS: "+details;
+
+const order={
+customer_name:name,
+customer_phone:phone,
+service_name:selected?
+selected.category+" - "+selected.service_name:
+"Product Order",
+order_details:orderDescription
+};
+
+try{
+
+const {error}=await db.from("orders").insert([order]);
+
+if(error)throw error;
+
+showMessage("Your order has been submitted successfully! Thank you for choosing AYANET.","green");
+
+form.reset();
+cart=[];
+renderCart();
+selectedPrice.textContent="";
+
+}catch(error){
+console.error("AYANET order error:",error);
+showMessage("Sorry, your order could not be submitted. Please try again or contact AYANET.","red");
+}finally{
+button.disabled=false;
+button.textContent="SUBMIT ORDER";
+}
+
+});
+
+loadServices();
+loadProducts();
+
+if("serviceWorker" in navigator){
+window.addEventListener("load",function(){
+navigator.serviceWorker.register("./service-worker.js")
+.catch(error=>console.error("Service worker error:",error));
+});
+}
 
 });
 </script>
-
 </body>
 </html>
