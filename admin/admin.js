@@ -1,10 +1,8 @@
-
 /* =====================================
    AYANET ADMIN DASHBOARD
-   PRODUCTS + BUYING COST + SELLING PRICE
-   LOW STOCK + SMART RESTOCK
-   SALES + SHOP EXPENSES
-   DAILY + MONTHLY FINANCIAL REPORTS
+   PRODUCTS + STOCK + SALES
+   EXPENSES + FINANCIAL REPORTS
+   SERVICE CATEGORIES + SERVICE PRICES
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -15,13 +13,21 @@ document.addEventListener("DOMContentLoaded", function () {
         "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
     );
 
-    const get = (id) => document.getElementById(id);
+    const get = id => document.getElementById(id);
 
     const LOW_STOCK_LEVEL = 20;
     const SHOP_TIMEZONE = "Africa/Nairobi";
 
     function money(value) {
         return Number(value || 0).toFixed(2);
+    }
+
+    function showDashboard(isLoggedIn) {
+        get("loginSection").style.display =
+            isLoggedIn ? "none" : "block";
+
+        get("adminDashboard").style.display =
+            isLoggedIn ? "block" : "none";
     }
 
     // =====================================
@@ -58,14 +64,6 @@ document.addEventListener("DOMContentLoaded", function () {
         return year + "-" + month;
     }
 
-    function showDashboard(isLoggedIn) {
-        get("loginSection").style.display =
-            isLoggedIn ? "none" : "block";
-
-        get("adminDashboard").style.display =
-            isLoggedIn ? "block" : "none";
-    }
-
     // =====================================
     // ADMIN LOGIN
     // =====================================
@@ -94,6 +92,255 @@ document.addEventListener("DOMContentLoaded", function () {
             message.textContent = "Error: " + error.message;
         }
     });
+
+    // =====================================
+    // SERVICE MANAGEMENT
+    // =====================================
+
+    get("serviceForm").addEventListener("submit", async function (e) {
+        e.preventDefault();
+
+        const message = get("serviceMessage");
+
+        const category = get("serviceCategory").value.trim();
+        const serviceName = get("serviceName").value.trim();
+        const description = get("serviceDescription").value.trim();
+        const priceInput = get("servicePrice").value;
+        const price = Number(priceInput);
+
+        if (
+            !category ||
+            !serviceName ||
+            priceInput === "" ||
+            !Number.isFinite(price) ||
+            price < 0
+        ) {
+            message.textContent =
+                "Please enter a category, service name and valid price.";
+            return;
+        }
+
+        message.textContent = "Adding service...";
+
+        const button = this.querySelector('button[type="submit"]');
+        button.disabled = true;
+
+        try {
+            const { error } = await db
+                .from("services")
+                .insert([{
+                    category: category,
+                    service_name: serviceName,
+                    description: description,
+                    price: price,
+                    is_active: true
+                }]);
+
+            if (error) {
+                message.textContent =
+                    "Could not add service: " + error.message;
+                return;
+            }
+
+            message.textContent = "Service added successfully!";
+
+            this.reset();
+
+            await loadServices();
+
+        } catch (error) {
+            message.textContent =
+                "Service error: " + error.message;
+
+        } finally {
+            button.disabled = false;
+        }
+    });
+
+    // LOAD SERVICES
+    async function loadServices() {
+        const container = get("services");
+
+        const { data, error } = await db
+            .from("services")
+            .select("*")
+            .order("category", { ascending: true })
+            .order("service_name", { ascending: true });
+
+        if (error) {
+            container.textContent =
+                "Could not load services: " + error.message;
+            return;
+        }
+
+        container.innerHTML = "";
+
+        if (!data || data.length === 0) {
+            container.textContent =
+                "No services added yet. Use the form above to add your first service.";
+            return;
+        }
+
+        // Group services by category
+        const groups = {};
+
+        data.forEach(service => {
+            const category = service.category || "Other";
+
+            if (!groups[category]) {
+                groups[category] = [];
+            }
+
+            groups[category].push(service);
+        });
+
+        Object.keys(groups).forEach(category => {
+            const categoryCard = document.createElement("div");
+            categoryCard.className = "service-category-card";
+
+            const heading = document.createElement("h3");
+            heading.textContent = category;
+
+            categoryCard.appendChild(heading);
+
+            groups[category].forEach(service => {
+                const serviceCard = document.createElement("div");
+                serviceCard.className = "service-card";
+
+                const name = document.createElement("h4");
+                name.textContent = service.service_name;
+
+                const description = document.createElement("p");
+                description.textContent =
+                    service.description || "No description provided.";
+
+                const price = document.createElement("p");
+                price.textContent =
+                    "Customer price: KSh " + money(service.price);
+
+                const status = document.createElement("p");
+                status.textContent = service.is_active
+                    ? "Status: ACTIVE"
+                    : "Status: INACTIVE";
+
+                const editButton = document.createElement("button");
+                editButton.type = "button";
+                editButton.textContent = "Edit Service";
+                editButton.onclick = () => editService(service);
+
+                const toggleButton = document.createElement("button");
+                toggleButton.type = "button";
+                toggleButton.textContent = service.is_active
+                    ? "Deactivate Service"
+                    : "Activate Service";
+
+                toggleButton.onclick = () =>
+                    toggleService(service);
+
+                serviceCard.append(
+                    name,
+                    description,
+                    price,
+                    status,
+                    editButton,
+                    toggleButton
+                );
+
+                categoryCard.appendChild(serviceCard);
+            });
+
+            container.appendChild(categoryCard);
+        });
+    }
+
+    // EDIT SERVICE
+    async function editService(service) {
+        const category = prompt(
+            "Enter service category:",
+            service.category
+        );
+
+        if (category === null) return;
+
+        const serviceName = prompt(
+            "Enter service name:",
+            service.service_name
+        );
+
+        if (serviceName === null) return;
+
+        const description = prompt(
+            "Enter service description:",
+            service.description || ""
+        );
+
+        if (description === null) return;
+
+        const priceInput = prompt(
+            "Enter customer price in KSh:",
+            service.price
+        );
+
+        if (priceInput === null) return;
+
+        const price = Number(priceInput);
+
+        if (
+            !category.trim() ||
+            !serviceName.trim() ||
+            priceInput.trim() === "" ||
+            !Number.isFinite(price) ||
+            price < 0
+        ) {
+            alert("Please enter valid service information.");
+            return;
+        }
+
+        const { error } = await db
+            .from("services")
+            .update({
+                category: category.trim(),
+                service_name: serviceName.trim(),
+                description: description.trim(),
+                price: price
+            })
+            .eq("id", service.id);
+
+        if (error) {
+            alert("Service update failed: " + error.message);
+            return;
+        }
+
+        alert("Service updated successfully!");
+
+        await loadServices();
+    }
+
+    // ACTIVATE OR DEACTIVATE SERVICE
+    async function toggleService(service) {
+        const newStatus = !service.is_active;
+
+        const action = newStatus ? "activate" : "deactivate";
+
+        if (!confirm(
+            "Are you sure you want to " +
+            action + " " + service.service_name + "?"
+        )) {
+            return;
+        }
+
+        const { error } = await db
+            .from("services")
+            .update({ is_active: newStatus })
+            .eq("id", service.id);
+
+        if (error) {
+            alert("Could not update service: " + error.message);
+            return;
+        }
+
+        await loadServices();
+    }
 
     // =====================================
     // CUSTOMER ORDERS
@@ -128,16 +375,20 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = order.customer_name || "Customer";
 
             const phone = document.createElement("p");
-            phone.textContent = "Phone: " + (order.phone || "");
+            phone.textContent =
+                "Phone: " + (order.customer_phone || "");
 
             const service = document.createElement("p");
-            service.textContent = "Service: " + (order.service || "");
+            service.textContent =
+                "Service: " + (order.service_name || "");
 
             const details = document.createElement("p");
-            details.textContent = "Details: " + (order.details || "");
+            details.textContent =
+                "Details: " + (order.order_details || "");
 
             const status = document.createElement("p");
-            status.textContent = "Status: " + (order.status || "Pending");
+            status.textContent =
+                "Status: " + (order.status || "Pending");
 
             card.append(heading, phone, service, details, status);
 
@@ -271,7 +522,7 @@ document.addEventListener("DOMContentLoaded", function () {
             const option = document.createElement("option");
             option.value = product.id;
             option.textContent =
-                product.name + " — Stock: " + product.stock;
+                product.name + " - Stock: " + product.stock;
 
             saleProduct.appendChild(option);
         });
@@ -917,7 +1168,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================
-    // FINANCIAL REPORTS SECTION
+    // FINANCIAL REPORTS
     // =====================================
 
     function createFinancialReportsSection() {
@@ -937,20 +1188,36 @@ document.addEventListener("DOMContentLoaded", function () {
         dailyHeading.textContent = "Today's Financial Report";
 
         const dailyRevenue = document.createElement("p");
-        dailyRevenue.innerHTML =
-            'Sales Revenue: KSh <span id="dailyRevenue">0.00</span>';
+        dailyRevenue.textContent = "Sales Revenue: KSh ";
+
+        const dailyRevenueValue = document.createElement("span");
+        dailyRevenueValue.id = "dailyRevenue";
+        dailyRevenueValue.textContent = "0.00";
+        dailyRevenue.appendChild(dailyRevenueValue);
 
         const dailyGross = document.createElement("p");
-        dailyGross.innerHTML =
-            'Known Gross Profit: KSh <span id="dailyGrossProfit">0.00</span>';
+        dailyGross.textContent = "Known Gross Profit: KSh ";
+
+        const dailyGrossValue = document.createElement("span");
+        dailyGrossValue.id = "dailyGrossProfit";
+        dailyGrossValue.textContent = "0.00";
+        dailyGross.appendChild(dailyGrossValue);
 
         const dailyExpenses = document.createElement("p");
-        dailyExpenses.innerHTML =
-            'Shop Expenses: KSh <span id="dailyExpenses">0.00</span>';
+        dailyExpenses.textContent = "Shop Expenses: KSh ";
+
+        const dailyExpensesValue = document.createElement("span");
+        dailyExpensesValue.id = "dailyExpenses";
+        dailyExpensesValue.textContent = "0.00";
+        dailyExpenses.appendChild(dailyExpensesValue);
 
         const dailyNet = document.createElement("p");
-        dailyNet.innerHTML =
-            'Known Net Profit: KSh <span id="dailyNetProfit">0.00</span>';
+        dailyNet.textContent = "Known Net Profit: KSh ";
+
+        const dailyNetValue = document.createElement("span");
+        dailyNetValue.id = "dailyNetProfit";
+        dailyNetValue.textContent = "0.00";
+        dailyNet.appendChild(dailyNetValue);
 
         const dailyStatus = document.createElement("p");
         dailyStatus.id = "dailyProfitStatus";
@@ -961,27 +1228,42 @@ document.addEventListener("DOMContentLoaded", function () {
         monthlyHeading.textContent = "This Month's Financial Report";
 
         const monthlyRevenue = document.createElement("p");
-        monthlyRevenue.innerHTML =
-            'Sales Revenue: KSh <span id="monthlyRevenue">0.00</span>';
+        monthlyRevenue.textContent = "Sales Revenue: KSh ";
+
+        const monthlyRevenueValue = document.createElement("span");
+        monthlyRevenueValue.id = "monthlyRevenue";
+        monthlyRevenueValue.textContent = "0.00";
+        monthlyRevenue.appendChild(monthlyRevenueValue);
 
         const monthlyGross = document.createElement("p");
-        monthlyGross.innerHTML =
-            'Known Gross Profit: KSh <span id="monthlyGrossProfit">0.00</span>';
+        monthlyGross.textContent = "Known Gross Profit: KSh ";
+
+        const monthlyGrossValue = document.createElement("span");
+        monthlyGrossValue.id = "monthlyGrossProfit";
+        monthlyGrossValue.textContent = "0.00";
+        monthlyGross.appendChild(monthlyGrossValue);
 
         const monthlyExpenses = document.createElement("p");
-        monthlyExpenses.innerHTML =
-            'Shop Expenses: KSh <span id="monthlyExpenses">0.00</span>';
+        monthlyExpenses.textContent = "Shop Expenses: KSh ";
+
+        const monthlyExpensesValue = document.createElement("span");
+        monthlyExpensesValue.id = "monthlyExpenses";
+        monthlyExpensesValue.textContent = "0.00";
+        monthlyExpenses.appendChild(monthlyExpensesValue);
 
         const monthlyNet = document.createElement("p");
-        monthlyNet.innerHTML =
-            'Known Net Profit: KSh <span id="monthlyNetProfit">0.00</span>';
+        monthlyNet.textContent = "Known Net Profit: KSh ";
+
+        const monthlyNetValue = document.createElement("span");
+        monthlyNetValue.id = "monthlyNetProfit";
+        monthlyNetValue.textContent = "0.00";
+        monthlyNet.appendChild(monthlyNetValue);
 
         const monthlyStatus = document.createElement("p");
         monthlyStatus.id = "monthlyProfitStatus";
 
         const refreshButton = document.createElement("button");
         refreshButton.type = "button";
-        refreshButton.id = "refreshFinancialReports";
         refreshButton.textContent = "Refresh Financial Reports";
         refreshButton.addEventListener("click", loadFinancialReports);
 
@@ -1042,13 +1324,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     .select("created_at, amount")
             ]);
 
-            if (salesResult.error) {
-                throw salesResult.error;
-            }
-
-            if (expensesResult.error) {
-                throw expensesResult.error;
-            }
+            if (salesResult.error) throw salesResult.error;
+            if (expensesResult.error) throw expensesResult.error;
 
             const sales = salesResult.data || [];
             const expenses = expensesResult.data || [];
@@ -1073,8 +1350,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     ) {
                         missingCostSales++;
                     } else {
-                        grossProfit +=
-                            total -
+                        grossProfit += total -
                             (Number(sale.cost_price) * quantity);
                     }
                 });
@@ -1086,11 +1362,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
                 return {
-                    revenue: revenue,
-                    grossProfit: grossProfit,
+                    revenue,
+                    grossProfit,
                     expenses: expenseTotal,
                     netProfit: grossProfit - expenseTotal,
-                    missingCostSales: missingCostSales
+                    missingCostSales
                 };
             }
 
@@ -1197,6 +1473,7 @@ document.addEventListener("DOMContentLoaded", function () {
             createFinancialReportsSection();
 
             await loadOrders();
+            await loadServices();
             await loadProducts();
             await loadSales();
             await loadExpenses();
