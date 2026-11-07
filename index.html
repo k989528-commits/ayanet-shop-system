@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -187,6 +188,7 @@ const categories={};
 
 availableServices.forEach(service=>{
 const category=service.category||"Other";
+
 if(!categories[category])categories[category]=[];
 categories[category].push(service);
 
@@ -241,6 +243,7 @@ const choose=document.createElement("button");
 choose.className="choose-service";
 choose.type="button";
 choose.textContent="Choose This Service";
+
 choose.addEventListener("click",()=>{
 serviceSelect.value=service.id;
 selectedPrice.textContent="Customer Price: KSh "+money(service.price);
@@ -288,6 +291,7 @@ if(product.image_url){
 const img=document.createElement("img");
 img.src=product.image_url;
 img.alt=product.name;
+
 img.onerror=()=>{
 img.remove();
 const placeholder=document.createElement("div");
@@ -295,6 +299,7 @@ placeholder.className="placeholder";
 placeholder.textContent="🛍️";
 card.prepend(placeholder);
 };
+
 card.appendChild(img);
 }else{
 const placeholder=document.createElement("div");
@@ -370,11 +375,14 @@ const controls=document.createElement("div");
 const minus=document.createElement("button");
 minus.className="quantity-button";
 minus.textContent="−";
+
 minus.addEventListener("click",()=>{
 item.quantity--;
+
 if(item.quantity<=0){
 cart=cart.filter(product=>String(product.id)!==String(item.id));
 }
+
 renderCart();
 });
 
@@ -384,11 +392,13 @@ quantity.textContent=" "+item.quantity+" ";
 const plus=document.createElement("button");
 plus.className="quantity-button";
 plus.textContent="+";
+
 plus.addEventListener("click",()=>{
 if(item.quantity>=Number(item.stock)){
 alert("Sorry, no more stock is available.");
 return;
 }
+
 item.quantity++;
 renderCart();
 });
@@ -396,6 +406,7 @@ renderCart();
 const remove=document.createElement("button");
 remove.className="remove-button";
 remove.textContent="Remove";
+
 remove.addEventListener("click",()=>{
 cart=cart.filter(product=>String(product.id)!==String(item.id));
 renderCart();
@@ -412,8 +423,11 @@ cartTotal.textContent="Total: KSh "+money(total);
 }
 
 serviceSelect.addEventListener("change",function(){
+
 const service=availableServices.find(item=>String(item.id)===this.value);
-selectedPrice.textContent=service?"Customer Price: KSh "+money(service.price):"";
+
+selectedPrice.textContent=service?
+"Customer Price: KSh "+money(service.price):"";
 });
 
 form.addEventListener("submit",async function(event){
@@ -449,45 +463,91 @@ orderDescription+="SERVICE: "+selected.category+" - "+selected.service_name+
 
 if(cart.length){
 orderDescription+="PRODUCTS:\n";
+
 cart.forEach(item=>{
 orderDescription+=item.name+" x "+item.quantity+
 " @ KSh "+money(item.price)+" = KSh "+
 money(item.price*item.quantity)+"\n";
 });
+
 const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
+
 orderDescription+="PRODUCT TOTAL: KSh "+money(total)+"\n";
 }
 
 orderDescription+="CUSTOMER DETAILS: "+details;
 
-const order={
-customer_name:name,
-customer_phone:phone,
-service_name:selected?
-selected.category+" - "+selected.service_name:
-"Product Order",
-order_details:orderDescription
-};
-
 try{
 
-const {error}=await db.from("orders").insert([order]);
+if(cart.length){
+
+// PRODUCT CHECKOUT:
+// Saves the order, deducts stock and records sales
+// together inside the secure Supabase function.
+
+const {data,error}=await db.rpc("place_product_order",{
+p_customer_name:name,
+p_customer_phone:phone,
+p_service_name:selected?
+selected.category+" - "+selected.service_name:
+"Product Order",
+p_order_details:orderDescription,
+p_items:cart.map(item=>({
+product_id:Number(item.id),
+quantity:Number(item.quantity)
+}))
+});
 
 if(error)throw error;
 
-showMessage("Your order has been submitted successfully! Thank you for choosing AYANET.","green");
+console.log("AYANET product order number:",data);
+
+}else{
+
+// SERVICE-ONLY CHECKOUT:
+// Keep the existing service ordering process.
+
+const {error}=await db
+.from("orders")
+.insert([{
+customer_name:name,
+customer_phone:phone,
+service_name:selected.category+" - "+selected.service_name+
+" (KSh "+money(selected.price)+")",
+order_details:orderDescription
+}]);
+
+if(error)throw error;
+
+}
+
+showMessage(
+"Your order has been submitted successfully! Thank you for choosing AYANET.",
+"green"
+);
 
 form.reset();
 cart=[];
 renderCart();
 selectedPrice.textContent="";
 
+// Reload the product list to show the new stock quantities.
+await loadProducts();
+
 }catch(error){
-console.error("AYANET order error:",error);
-showMessage("Sorry, your order could not be submitted. Please try again or contact AYANET.","red");
+
+console.error("AYANET checkout error:",error);
+
+showMessage(
+"Sorry, your order could not be submitted. "+(error.message||"Please try again."),
+"red"
+);
+
 }finally{
+
 button.disabled=false;
 button.textContent="SUBMIT ORDER";
+
 }
 
 });
