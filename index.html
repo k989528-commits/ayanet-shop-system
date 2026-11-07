@@ -63,6 +63,11 @@ textarea{min-height:100px;resize:vertical}
 .printing-fields{display:none;background:#f3f6fb;border:1px solid #dbe3ef;padding:15px;border-radius:9px;margin-top:15px}
 .printing-fields.visible{display:block}
 .printing-fields p{font-size:13px;color:#64748b;line-height:1.5;margin-bottom:8px}
+.payment-box{background:#fff9e8;border:2px solid #f4c542;border-radius:10px;padding:18px;margin-top:20px}
+.payment-box h3{color:#102b50;margin-bottom:12px}
+.payment-number{font-size:25px;font-weight:bold;color:#137547;letter-spacing:1px;margin:8px 0}
+.payment-box p{font-size:14px;line-height:1.7;color:#475569}
+.payment-warning{margin-top:12px;padding:10px;background:#fff0d1;border-radius:7px;color:#805500;font-size:13px;line-height:1.5}
 button:disabled{opacity:.6;cursor:not-allowed}
 footer{background:#102b50;color:white;text-align:center;padding:25px 15px;line-height:1.8}
 footer strong{color:#f4c542}
@@ -104,6 +109,7 @@ footer strong{color:#f4c542}
 <p>Enter your details to submit your order.</p>
 
 <form id="orderForm">
+
 <label for="customerName">Your Full Name</label>
 <input type="text" id="customerName" placeholder="Enter your name" required>
 
@@ -133,6 +139,33 @@ footer strong{color:#f4c542}
 <label for="printCopies">Number of Copies</label>
 <input type="number" id="printCopies" min="1" max="500" value="1">
 </div>
+
+<div class="payment-box">
+<h3>💳 PAY WITH M-PESA</h3>
+<p><strong>Payment method:</strong> Lipa na M-Pesa – Pochi la Biashara</p>
+<p><strong>Business name:</strong> Sonita Letikirich</p>
+<div class="payment-number">0743 431 448</div>
+<p><strong>How to pay:</strong></p>
+<p>
+1. Open your M-Pesa menu.<br>
+2. Select Pochi la Biashara.<br>
+3. Follow the prompts to pay the business above.<br>
+4. Enter the M-Pesa confirmation code below.
+</p>
+<div class="payment-warning">
+Please check the business name and amount before confirming your payment. AYANET will verify your payment before marking your order as paid.
+</div>
+</div>
+
+<label for="mpesaCode">M-Pesa Confirmation Code</label>
+<input
+type="text"
+id="mpesaCode"
+placeholder="Enter your M-Pesa transaction code"
+maxlength="20"
+autocomplete="off"
+required
+>
 
 <label for="orderDetails">Order Details</label>
 <textarea id="orderDetails" placeholder="Additional instructions or details..." required></textarea>
@@ -171,6 +204,7 @@ const printingFields=document.getElementById("printingFields");
 const printingDocument=document.getElementById("printingDocument");
 const printType=document.getElementById("printType");
 const printCopies=document.getElementById("printCopies");
+const mpesaCodeInput=document.getElementById("mpesaCode");
 
 let availableServices=[];
 let availableProducts=[];
@@ -209,7 +243,6 @@ printingDocument.required=printing;
 }
 
 function validPrintingFile(file){
-
 if(!file)return false;
 
 const extension=file.name.split(".").pop().toLowerCase();
@@ -509,9 +542,15 @@ return;
 const name=document.getElementById("customerName").value.trim();
 const phone=document.getElementById("customerPhone").value.trim();
 const details=document.getElementById("orderDetails").value.trim();
+const mpesaCode=mpesaCodeInput.value.trim().toUpperCase();
 
 if(!name||!phone||!details){
 showMessage("Please complete all required fields.","red");
+return;
+}
+
+if(!/^[A-Z0-9]{6,20}$/.test(mpesaCode)){
+showMessage("Please enter a valid M-Pesa confirmation code (6–20 letters or numbers).","red");
 return;
 }
 
@@ -575,7 +614,12 @@ const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
 orderDescription+="PRODUCT TOTAL: KSh "+money(total)+"\n";
 }
 
-orderDescription+="CUSTOMER DETAILS: "+details;
+orderDescription+="CUSTOMER DETAILS: "+details+"\n";
+orderDescription+="PAYMENT METHOD: Pochi la Biashara\n";
+orderDescription+="POCHI BUSINESS: Sonita Letikirich\n";
+orderDescription+="POCHI NUMBER: 0743431448\n";
+orderDescription+="MPESA CONFIRMATION CODE: "+mpesaCode+"\n";
+orderDescription+="PAYMENT STATUS: PENDING VERIFICATION";
 
 try{
 
@@ -623,7 +667,9 @@ customer_name:name,
 customer_phone:phone,
 service_name:selected.category+" - "+selected.service_name+
 " (KSh "+money(selected.price)+")",
-order_details:orderDescription
+order_details:orderDescription,
+mpesa_code:mpesaCode,
+payment_status:"Pending"
 };
 
 if(printing){
@@ -640,7 +686,7 @@ if(error)throw error;
 }
 
 showMessage(
-"Your order has been submitted successfully! Thank you for choosing AYANET.",
+"Your order has been submitted successfully! Your payment is pending verification. Thank you for choosing AYANET.",
 "green"
 );
 
