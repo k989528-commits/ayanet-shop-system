@@ -1,38 +1,26 @@
 /* =====================================
    AYANET ADMIN DASHBOARD
-   PRODUCTS + STOCK + SALES
-   EXPENSES + FINANCIAL REPORTS
-   SERVICE CATEGORIES + SERVICE PRICES
+   PRODUCTS + BUYING COST + SELLING PRICE
+   LOW STOCK + SMART RESTOCK
+   SALES + SHOP EXPENSES
+   DAILY + MONTHLY FINANCIAL REPORTS
+   SERVICE MANAGEMENT
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
 
-    // SUPABASE CONNECTION
     const db = window.supabase.createClient(
         "https://jltadhukraspfdaxbvwo.supabase.co",
         "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
     );
 
     const get = id => document.getElementById(id);
-
     const LOW_STOCK_LEVEL = 20;
     const SHOP_TIMEZONE = "Africa/Nairobi";
 
     function money(value) {
         return Number(value || 0).toFixed(2);
     }
-
-    function showDashboard(isLoggedIn) {
-        get("loginSection").style.display =
-            isLoggedIn ? "none" : "block";
-
-        get("adminDashboard").style.display =
-            isLoggedIn ? "block" : "none";
-    }
-
-    // =====================================
-    // KENYA DATE HELPERS
-    // =====================================
 
     function getKenyaDateKey(date) {
         const parts = new Intl.DateTimeFormat("en-GB", {
@@ -43,10 +31,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }).formatToParts(date);
 
         const values = {};
-
-        parts.forEach(part => {
-            values[part.type] = part.value;
-        });
+        parts.forEach(part => values[part.type] = part.value);
 
         return values.year + "-" + values.month + "-" + values.day;
     }
@@ -62,6 +47,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const month = parts.find(p => p.type === "month").value;
 
         return year + "-" + month;
+    }
+
+    function showDashboard(isLoggedIn) {
+        get("loginSection").style.display = isLoggedIn ? "none" : "block";
+        get("adminDashboard").style.display = isLoggedIn ? "block" : "none";
     }
 
     // =====================================
@@ -101,96 +91,74 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
 
         const message = get("serviceMessage");
-
         const category = get("serviceCategory").value.trim();
         const serviceName = get("serviceName").value.trim();
         const description = get("serviceDescription").value.trim();
         const priceInput = get("servicePrice").value;
         const price = Number(priceInput);
 
-        if (
-            !category ||
-            !serviceName ||
-            priceInput === "" ||
-            !Number.isFinite(price) ||
-            price < 0
-        ) {
-            message.textContent =
-                "Please enter a category, service name and valid price.";
+        if (!category || !serviceName || priceInput === "" ||
+            !Number.isFinite(price) || price < 0) {
+            message.textContent = "Enter a category, service name and valid price.";
             return;
         }
 
-        message.textContent = "Adding service...";
-
         const button = this.querySelector('button[type="submit"]');
         button.disabled = true;
+        message.textContent = "Adding service...";
 
         try {
-            const { error } = await db
-                .from("services")
-                .insert([{
-                    category: category,
-                    service_name: serviceName,
-                    description: description,
-                    price: price,
-                    is_active: true
-                }]);
+            const { error } = await db.from("services").insert([{
+                category,
+                service_name: serviceName,
+                description,
+                price,
+                is_active: true
+            }]);
 
             if (error) {
-                message.textContent =
-                    "Could not add service: " + error.message;
+                message.textContent = "Could not add service: " + error.message;
                 return;
             }
 
             message.textContent = "Service added successfully!";
-
             this.reset();
-
             await loadServices();
 
         } catch (error) {
-            message.textContent =
-                "Service error: " + error.message;
+            message.textContent = "Service error: " + error.message;
 
         } finally {
             button.disabled = false;
         }
     });
 
-    // LOAD SERVICES
     async function loadServices() {
         const container = get("services");
 
         const { data, error } = await db
             .from("services")
             .select("*")
-            .order("category", { ascending: true })
-            .order("service_name", { ascending: true });
+            .order("category")
+            .order("service_name");
 
         if (error) {
-            container.textContent =
-                "Could not load services: " + error.message;
+            container.textContent = "Could not load services: " + error.message;
             return;
         }
 
         container.innerHTML = "";
 
         if (!data || data.length === 0) {
-            container.textContent =
-                "No services added yet. Use the form above to add your first service.";
+            container.textContent = "No services added yet.";
             return;
         }
 
-        // Group services by category
         const groups = {};
 
         data.forEach(service => {
             const category = service.category || "Other";
-
-            if (!groups[category]) {
-                groups[category] = [];
-            }
-
+            if (!groups[category]) groups[category] = [];
             groups[category].push(service);
         });
 
@@ -200,28 +168,23 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const heading = document.createElement("h3");
             heading.textContent = category;
-
             categoryCard.appendChild(heading);
 
             groups[category].forEach(service => {
-                const serviceCard = document.createElement("div");
-                serviceCard.className = "service-card";
+                const card = document.createElement("div");
+                card.className = "service-card";
 
                 const name = document.createElement("h4");
                 name.textContent = service.service_name;
 
                 const description = document.createElement("p");
-                description.textContent =
-                    service.description || "No description provided.";
+                description.textContent = service.description || "No description provided.";
 
                 const price = document.createElement("p");
-                price.textContent =
-                    "Customer price: KSh " + money(service.price);
+                price.textContent = "Customer price: KSh " + money(service.price);
 
                 const status = document.createElement("p");
-                status.textContent = service.is_active
-                    ? "Status: ACTIVE"
-                    : "Status: INACTIVE";
+                status.textContent = service.is_active ? "Status: ACTIVE" : "Status: INACTIVE";
 
                 const editButton = document.createElement("button");
                 editButton.type = "button";
@@ -233,76 +196,54 @@ document.addEventListener("DOMContentLoaded", function () {
                 toggleButton.textContent = service.is_active
                     ? "Deactivate Service"
                     : "Activate Service";
+                toggleButton.onclick = () => toggleService(service);
 
-                toggleButton.onclick = () =>
-                    toggleService(service);
+                const deleteButton = document.createElement("button");
+                deleteButton.type = "button";
+                deleteButton.textContent = "Delete Service";
+                deleteButton.onclick = () => deleteService(service);
 
-                serviceCard.append(
-                    name,
-                    description,
-                    price,
-                    status,
-                    editButton,
-                    toggleButton
+                card.append(
+                    name, description, price, status,
+                    editButton, toggleButton, deleteButton
                 );
 
-                categoryCard.appendChild(serviceCard);
+                categoryCard.appendChild(card);
             });
 
             container.appendChild(categoryCard);
         });
     }
 
-    // EDIT SERVICE
     async function editService(service) {
-        const category = prompt(
-            "Enter service category:",
-            service.category
-        );
-
+        const category = prompt("Enter service category:", service.category);
         if (category === null) return;
 
-        const serviceName = prompt(
-            "Enter service name:",
-            service.service_name
-        );
-
+        const serviceName = prompt("Enter service name:", service.service_name);
         if (serviceName === null) return;
 
         const description = prompt(
-            "Enter service description:",
-            service.description || ""
+            "Enter service description:", service.description || ""
         );
-
         if (description === null) return;
 
-        const priceInput = prompt(
-            "Enter customer price in KSh:",
-            service.price
-        );
-
+        const priceInput = prompt("Enter customer price in KSh:", service.price);
         if (priceInput === null) return;
 
         const price = Number(priceInput);
 
-        if (
-            !category.trim() ||
-            !serviceName.trim() ||
-            priceInput.trim() === "" ||
-            !Number.isFinite(price) ||
-            price < 0
-        ) {
+        if (!category.trim() || !serviceName.trim() ||
+            priceInput.trim() === "" || !Number.isFinite(price) || price < 0) {
             alert("Please enter valid service information.");
             return;
         }
 
-        const { error } = await db
-            .from("services")
+        const { error } = await db.from("services")
             .update({
                 category: category.trim(),
                 service_name: serviceName.trim(),
                 description: description.trim(),
-                price: price
+                price
             })
             .eq("id", service.id);
 
@@ -312,25 +253,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         alert("Service updated successfully!");
-
         await loadServices();
     }
 
-    // ACTIVATE OR DEACTIVATE SERVICE
     async function toggleService(service) {
         const newStatus = !service.is_active;
-
         const action = newStatus ? "activate" : "deactivate";
 
-        if (!confirm(
-            "Are you sure you want to " +
-            action + " " + service.service_name + "?"
-        )) {
-            return;
-        }
+        if (!confirm("Are you sure you want to " + action +
+            " " + service.service_name + "?")) return;
 
-        const { error } = await db
-            .from("services")
+        const { error } = await db.from("services")
             .update({ is_active: newStatus })
             .eq("id", service.id);
 
@@ -342,6 +275,24 @@ document.addEventListener("DOMContentLoaded", function () {
         await loadServices();
     }
 
+    async function deleteService(service) {
+        if (!confirm(
+            'Permanently delete "' + service.service_name + '"?'
+        )) return;
+
+        const { error } = await db.from("services")
+            .delete()
+            .eq("id", service.id);
+
+        if (error) {
+            alert("Could not delete service: " + error.message);
+            return;
+        }
+
+        alert("Service deleted successfully!");
+        await loadServices();
+    }
+
     // =====================================
     // CUSTOMER ORDERS
     // =====================================
@@ -349,14 +300,12 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadOrders() {
         const container = get("orders");
 
-        const { data, error } = await db
-            .from("orders")
+        const { data, error } = await db.from("orders")
             .select("*")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load orders: " + error.message;
+            container.textContent = "Failed to load orders: " + error.message;
             return;
         }
 
@@ -375,20 +324,16 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = order.customer_name || "Customer";
 
             const phone = document.createElement("p");
-            phone.textContent =
-                "Phone: " + (order.customer_phone || "");
+            phone.textContent = "Phone: " + (order.customer_phone || "");
 
             const service = document.createElement("p");
-            service.textContent =
-                "Service: " + (order.service_name || "");
+            service.textContent = "Service: " + (order.service_name || "");
 
             const details = document.createElement("p");
-            details.textContent =
-                "Details: " + (order.order_details || "");
+            details.textContent = "Details: " + (order.order_details || "");
 
             const status = document.createElement("p");
-            status.textContent =
-                "Status: " + (order.status || "Pending");
+            status.textContent = "Status: " + (order.status || "Pending");
 
             card.append(heading, phone, service, details, status);
 
@@ -408,8 +353,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function completeOrder(orderId) {
-        const { error } = await db
-            .from("orders")
+        const { error } = await db.from("orders")
             .update({ status: "Completed" })
             .eq("id", orderId);
 
@@ -429,7 +373,6 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
 
         const message = get("productMessage");
-
         const name = get("productName").value.trim();
         const description = get("productDescription").value.trim();
 
@@ -441,54 +384,36 @@ document.addEventListener("DOMContentLoaded", function () {
         const price = Number(priceInput);
         const stock = Number(stockInput);
 
-        if (
-            !name ||
-            costPriceInput === "" ||
-            priceInput === "" ||
-            stockInput === "" ||
-            !Number.isFinite(costPrice) ||
-            !Number.isFinite(price) ||
-            costPrice <= 0 ||
-            price <= 0 ||
-            stock < 0 ||
-            !Number.isInteger(stock)
-        ) {
+        if (!name || costPriceInput === "" || priceInput === "" ||
+            stockInput === "" || !Number.isFinite(costPrice) ||
+            !Number.isFinite(price) || costPrice <= 0 || price <= 0 ||
+            stock < 0 || !Number.isInteger(stock)) {
             message.textContent =
                 "Please enter valid buying price, selling price and stock.";
             return;
         }
 
-        if (price < costPrice) {
-            if (!confirm(
-                "Warning: Your selling price is lower than your buying cost. " +
-                "This means you may make a loss. Continue?"
-            )) {
-                return;
-            }
-        }
+        if (price < costPrice && !confirm(
+            "Warning: Selling price is lower than buying cost. Continue?"
+        )) return;
 
         message.textContent = "Adding product...";
 
-        const { error } = await db
-            .from("products")
-            .insert([{
-                name: name,
-                description: description,
-                cost_price: costPrice,
-                price: price,
-                stock: stock
-            }]);
+        const { error } = await db.from("products").insert([{
+            name,
+            description,
+            cost_price: costPrice,
+            price,
+            stock
+        }]);
 
         if (error) {
-            message.textContent =
-                "Failed to add product: " + error.message;
+            message.textContent = "Failed to add product: " + error.message;
             return;
         }
 
         message.textContent = "Product added successfully!";
-
         this.reset();
-
         await loadProducts();
     });
 
@@ -500,14 +425,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const container = get("products");
         const saleProduct = get("saleProduct");
 
-        const { data, error } = await db
-            .from("products")
+        const { data, error } = await db.from("products")
             .select("*")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load products: " + error.message;
+            container.textContent = "Failed to load products: " + error.message;
             return;
         }
 
@@ -521,9 +444,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (data || []).forEach(product => {
             const option = document.createElement("option");
             option.value = product.id;
-            option.textContent =
-                product.name + " - Stock: " + product.stock;
-
+            option.textContent = product.name + " - Stock: " + product.stock;
             saleProduct.appendChild(option);
         });
 
@@ -542,35 +463,24 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = product.name;
 
             const description = document.createElement("p");
-            description.textContent =
-                "Description: " + (product.description || "");
+            description.textContent = "Description: " + (product.description || "");
 
             const cost = document.createElement("p");
             const price = document.createElement("p");
             const profit = document.createElement("p");
 
-            price.textContent =
-                "Selling price: KSh " + money(product.price);
+            price.textContent = "Selling price: KSh " + money(product.price);
 
-            if (
-                product.cost_price !== null &&
-                product.cost_price !== undefined
-            ) {
+            if (product.cost_price !== null && product.cost_price !== undefined) {
                 const buyingCost = Number(product.cost_price);
                 const sellingPrice = Number(product.price);
-                const profitAmount = sellingPrice - buyingCost;
 
-                cost.textContent =
-                    "Average buying cost: KSh " + money(buyingCost);
-
-                profit.textContent =
-                    "Profit per item: KSh " + money(profitAmount);
+                cost.textContent = "Average buying cost: KSh " + money(buyingCost);
+                profit.textContent = "Profit per item: KSh " +
+                    money(sellingPrice - buyingCost);
             } else {
-                cost.textContent =
-                    "Average buying cost: Not entered yet";
-
-                profit.textContent =
-                    "Profit per item: Not available";
+                cost.textContent = "Average buying cost: Not entered yet";
+                profit.textContent = "Profit per item: Not available";
             }
 
             const stock = document.createElement("p");
@@ -596,20 +506,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const deleteButton = document.createElement("button");
             deleteButton.textContent = "Delete Product";
-            deleteButton.onclick =
-                () => deleteProduct(product.id, product.name);
+            deleteButton.onclick = () => deleteProduct(product.id, product.name);
 
             card.append(
-                heading,
-                description,
-                cost,
-                price,
-                profit,
-                stock,
-                stockStatus,
-                restockButton,
-                editButton,
-                deleteButton
+                heading, description, cost, price, profit,
+                stock, stockStatus, restockButton, editButton, deleteButton
             );
 
             container.appendChild(card);
@@ -629,43 +530,32 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const quantity = Number(quantityAnswer);
 
-        if (
-            quantityAnswer.trim() === "" ||
-            !Number.isInteger(quantity) ||
-            quantity <= 0
-        ) {
+        if (quantityAnswer.trim() === "" ||
+            !Number.isInteger(quantity) || quantity <= 0) {
             alert("Please enter a valid whole number greater than zero.");
             return;
         }
 
         const costAnswer = prompt(
-            "What is the buying price for ONE " +
-            product.name + " from your supplier? (KSh)"
+            "Buying price for ONE " + product.name + " (KSh)?"
         );
 
         if (costAnswer === null) return;
 
         const unitCost = Number(costAnswer);
 
-        if (
-            costAnswer.trim() === "" ||
-            !Number.isFinite(unitCost) ||
-            unitCost <= 0
-        ) {
+        if (costAnswer.trim() === "" ||
+            !Number.isFinite(unitCost) || unitCost <= 0) {
             alert("Please enter a valid buying price greater than zero.");
             return;
         }
 
-        const confirmed = confirm(
-            "Please confirm this restock:\n\n" +
-            "Product: " + product.name + "\n" +
-            "Quantity: " + quantity + "\n" +
-            "Buying price per item: KSh " + money(unitCost) + "\n" +
-            "Total purchase cost: KSh " +
-            money(quantity * unitCost)
-        );
-
-        if (!confirmed) return;
+        if (!confirm(
+            "Confirm restock:\n\nProduct: " + product.name +
+            "\nQuantity: " + quantity +
+            "\nBuying price per item: KSh " + money(unitCost) +
+            "\nTotal purchase cost: KSh " + money(quantity * unitCost)
+        )) return;
 
         const message = get("productMessage");
         message.textContent = "Recording restock...";
@@ -677,24 +567,20 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (error) {
-            message.textContent =
-                "Restocking failed: " + error.message;
-
+            message.textContent = "Restocking failed: " + error.message;
             alert("Restocking failed: " + error.message);
             return;
         }
 
         const updatedProduct = Array.isArray(data) ? data[0] : data;
 
-        message.textContent =
-            product.name + " restocked successfully!";
+        message.textContent = product.name + " restocked successfully!";
 
         if (updatedProduct) {
             alert(
-                "Restock successful!\n\n" +
-                "Product: " + updatedProduct.name + "\n" +
-                "New stock: " + updatedProduct.stock + "\n" +
-                "Average buying cost: KSh " +
+                "Restock successful!\n\nProduct: " + updatedProduct.name +
+                "\nNew stock: " + updatedProduct.stock +
+                "\nAverage buying cost: KSh " +
                 money(updatedProduct.cost_price)
             );
         } else {
@@ -724,14 +610,12 @@ document.addEventListener("DOMContentLoaded", function () {
         priceInput.min = "0.01";
         priceInput.step = "0.01";
         priceInput.value = product.price;
-        priceInput.placeholder = "Selling price";
 
         const stockInput = document.createElement("input");
         stockInput.type = "number";
         stockInput.min = "0";
         stockInput.step = "1";
         stockInput.value = product.stock;
-        stockInput.placeholder = "Stock";
 
         const saveButton = document.createElement("button");
         saveButton.textContent = "Save Changes";
@@ -740,29 +624,19 @@ document.addEventListener("DOMContentLoaded", function () {
         cancelButton.textContent = "Cancel";
 
         card.append(
-            nameInput,
-            descriptionInput,
-            priceInput,
-            stockInput,
-            saveButton,
-            cancelButton
+            nameInput, descriptionInput, priceInput,
+            stockInput, saveButton, cancelButton
         );
 
         saveButton.onclick = async function () {
             const name = nameInput.value.trim();
             const description = descriptionInput.value.trim();
-
             const price = Number(priceInput.value);
             const stock = Number(stockInput.value);
 
-            if (
-                !name ||
-                priceInput.value === "" ||
-                stockInput.value === "" ||
-                price <= 0 ||
-                stock < 0 ||
-                !Number.isInteger(stock)
-            ) {
+            if (!name || priceInput.value === "" ||
+                stockInput.value === "" || !Number.isFinite(price) ||
+                price <= 0 || stock < 0 || !Number.isInteger(stock)) {
                 alert("Please enter valid product details.");
                 return;
             }
@@ -770,27 +644,21 @@ document.addEventListener("DOMContentLoaded", function () {
             saveButton.disabled = true;
             saveButton.textContent = "Saving...";
 
-            const { data, error } = await db
-                .from("products")
+            const { data, error } = await db.from("products")
                 .update({ name, description, price, stock })
                 .eq("id", product.id)
                 .select("id")
                 .maybeSingle();
 
             if (error || !data) {
-                alert(
-                    "Product update failed: " +
-                    (error ? error.message : "No product updated.")
-                );
-
+                alert("Product update failed: " +
+                    (error ? error.message : "No product updated."));
                 saveButton.disabled = false;
                 saveButton.textContent = "Save Changes";
                 return;
             }
 
-            get("productMessage").textContent =
-                "Product updated successfully!";
-
+            get("productMessage").textContent = "Product updated successfully!";
             await loadProducts();
         };
 
@@ -802,14 +670,11 @@ document.addEventListener("DOMContentLoaded", function () {
     // =====================================
 
     async function deleteProduct(productId, productName) {
-        if (!confirm(
-            'Are you sure you want to delete "' + productName + '"?'
-        )) {
+        if (!confirm('Are you sure you want to delete "' + productName + '"?')) {
             return;
         }
 
-        const { error } = await db
-            .from("products")
+        const { error } = await db.from("products")
             .delete()
             .eq("id", productId);
 
@@ -818,9 +683,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        get("productMessage").textContent =
-            "Product deleted successfully!";
-
+        get("productMessage").textContent = "Product deleted successfully!";
         await loadProducts();
     }
 
@@ -835,18 +698,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const quantity = Number(get("saleQuantity").value);
         const message = get("saleMessage");
 
-        if (
-            !productId ||
-            !Number.isInteger(quantity) ||
-            quantity <= 0
-        ) {
-            message.textContent =
-                "Please select a product and enter a valid quantity.";
+        if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+            message.textContent = "Select a product and enter a valid quantity.";
             return;
         }
 
         const button = this.querySelector('button[type="submit"]');
-
         button.disabled = true;
         button.textContent = "Recording Sale...";
 
@@ -861,9 +718,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            message.textContent =
-                "Sale recorded successfully! Stock has been reduced.";
-
+            message.textContent = "Sale recorded successfully! Stock reduced.";
             this.reset();
 
             await loadProducts();
@@ -889,55 +744,42 @@ document.addEventListener("DOMContentLoaded", function () {
         e.preventDefault();
 
         const message = get("expenseMessage");
-
         const description = get("expenseDescription").value.trim();
         const category = get("expenseCategory").value;
         const amountInput = get("expenseAmount").value;
         const amount = Number(amountInput);
 
-        if (
-            !description ||
-            !category ||
-            amountInput === "" ||
-            !Number.isFinite(amount) ||
-            amount <= 0
-        ) {
-            message.textContent =
-                "Please enter a description, category and valid amount.";
+        if (!description || !category || amountInput === "" ||
+            !Number.isFinite(amount) || amount <= 0) {
+            message.textContent = "Enter a description, category and valid amount.";
             return;
         }
 
         const button = this.querySelector('button[type="submit"]');
-
         button.disabled = true;
         button.textContent = "Saving Expense...";
         message.textContent = "Recording expense...";
 
         try {
-            const { error } = await db
-                .from("expenses")
-                .insert([{
-                    description: description,
-                    category: category,
-                    amount: amount
-                }]);
+            const { error } = await db.from("expenses").insert([{
+                description,
+                category,
+                amount
+            }]);
 
             if (error) {
-                message.textContent =
-                    "Failed to record expense: " + error.message;
+                message.textContent = "Failed to record expense: " + error.message;
                 return;
             }
 
             message.textContent = "Expense recorded successfully!";
-
             this.reset();
 
             await loadExpenses();
             await loadFinancialReports();
 
         } catch (error) {
-            message.textContent =
-                "Expense error: " + error.message;
+            message.textContent = "Expense error: " + error.message;
 
         } finally {
             button.disabled = false;
@@ -952,15 +794,13 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadExpenses() {
         const container = get("expenses");
 
-        const { data, error } = await db
-            .from("expenses")
+        const { data, error } = await db.from("expenses")
             .select("*")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load expenses: " + error.message;
-            console.error("Expense loading error:", error.message);
+            container.textContent = "Failed to load expenses: " + error.message;
+            console.error(error.message);
             return;
         }
 
@@ -979,22 +819,18 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = expense.description;
 
             const category = document.createElement("p");
-            category.textContent =
-                "Category: " + (expense.category || "Other");
+            category.textContent = "Category: " + (expense.category || "Other");
 
             const amount = document.createElement("p");
-            amount.textContent =
-                "Amount: KSh " + money(expense.amount);
+            amount.textContent = "Amount: KSh " + money(expense.amount);
 
             const date = document.createElement("p");
-            date.textContent =
-                "Date: " + new Date(expense.created_at).toLocaleString(
-                    "en-KE",
-                    { timeZone: SHOP_TIMEZONE }
+            date.textContent = "Date: " +
+                new Date(expense.created_at).toLocaleString(
+                    "en-KE", { timeZone: SHOP_TIMEZONE }
                 );
 
             card.append(heading, category, amount, date);
-
             container.appendChild(card);
         });
     }
@@ -1006,14 +842,12 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadSales() {
         const container = get("sales");
 
-        const { data, error } = await db
-            .from("sales")
+        const { data, error } = await db.from("sales")
             .select("*")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load sales: " + error.message;
+            container.textContent = "Failed to load sales: " + error.message;
             return;
         }
 
@@ -1035,54 +869,31 @@ document.addEventListener("DOMContentLoaded", function () {
             quantity.textContent = "Quantity sold: " + sale.quantity;
 
             const price = document.createElement("p");
-            price.textContent =
-                "Selling price per item: KSh " + money(sale.price);
+            price.textContent = "Selling price per item: KSh " + money(sale.price);
 
             const total = document.createElement("p");
-            total.textContent =
-                "Sales total: KSh " + money(sale.total);
+            total.textContent = "Sales total: KSh " + money(sale.total);
 
             const cost = document.createElement("p");
             const profit = document.createElement("p");
 
-            if (
-                sale.cost_price !== null &&
-                sale.cost_price !== undefined
-            ) {
-                const costTotal =
-                    Number(sale.cost_price) * Number(sale.quantity);
-
-                cost.textContent =
-                    "Buying cost: KSh " + money(costTotal);
-
-                profit.textContent =
-                    "Gross profit: KSh " +
+            if (sale.cost_price !== null && sale.cost_price !== undefined) {
+                const costTotal = Number(sale.cost_price) * Number(sale.quantity);
+                cost.textContent = "Buying cost: KSh " + money(costTotal);
+                profit.textContent = "Gross profit: KSh " +
                     money(Number(sale.total) - costTotal);
             } else {
-                cost.textContent =
-                    "Buying cost: Not recorded for this sale";
-
-                profit.textContent =
-                    "Gross profit: Not available";
+                cost.textContent = "Buying cost: Not recorded for this sale";
+                profit.textContent = "Gross profit: Not available";
             }
 
             const date = document.createElement("p");
-            date.textContent =
-                "Date: " + new Date(sale.created_at).toLocaleString(
-                    "en-KE",
-                    { timeZone: SHOP_TIMEZONE }
+            date.textContent = "Date: " +
+                new Date(sale.created_at).toLocaleString(
+                    "en-KE", { timeZone: SHOP_TIMEZONE }
                 );
 
-            card.append(
-                heading,
-                quantity,
-                price,
-                total,
-                cost,
-                profit,
-                date
-            );
-
+            card.append(heading, quantity, price, total, cost, profit, date);
             container.appendChild(card);
         });
     }
@@ -1096,34 +907,30 @@ document.addEventListener("DOMContentLoaded", function () {
         const itemsElement = get("itemsSoldToday");
         const transactionsElement = get("transactionsToday");
 
-        const { data, error } = await db
-            .from("sales")
+        const { data, error } = await db.from("sales")
             .select("created_at, quantity, total");
 
         if (error) {
             totalElement.textContent = "Could not load";
             itemsElement.textContent = "Could not load";
             transactionsElement.textContent = "Could not load";
-            console.error("Daily summary error:", error.message);
+            console.error(error.message);
             return;
         }
 
         const todayKey = getKenyaDateKey(new Date());
-
         const sales = (data || []).filter(sale =>
             getKenyaDateKey(new Date(sale.created_at)) === todayKey
         );
 
-        const total = sales.reduce(
-            (sum, sale) => sum + Number(sale.total), 0
+        totalElement.textContent = money(
+            sales.reduce((sum, sale) => sum + Number(sale.total), 0)
         );
 
-        const items = sales.reduce(
+        itemsElement.textContent = sales.reduce(
             (sum, sale) => sum + Number(sale.quantity), 0
         );
 
-        totalElement.textContent = money(total);
-        itemsElement.textContent = items;
         transactionsElement.textContent = sales.length;
     }
 
@@ -1136,39 +943,35 @@ document.addEventListener("DOMContentLoaded", function () {
         const itemsElement = get("itemsSoldMonth");
         const transactionsElement = get("transactionsMonth");
 
-        const { data, error } = await db
-            .from("sales")
+        const { data, error } = await db.from("sales")
             .select("created_at, quantity, total");
 
         if (error) {
             totalElement.textContent = "Could not load";
             itemsElement.textContent = "Could not load";
             transactionsElement.textContent = "Could not load";
-            console.error("Monthly summary error:", error.message);
+            console.error(error.message);
             return;
         }
 
         const monthKey = getKenyaMonthKey(new Date());
-
         const sales = (data || []).filter(sale =>
             getKenyaMonthKey(new Date(sale.created_at)) === monthKey
         );
 
-        const total = sales.reduce(
-            (sum, sale) => sum + Number(sale.total), 0
+        totalElement.textContent = money(
+            sales.reduce((sum, sale) => sum + Number(sale.total), 0)
         );
 
-        const items = sales.reduce(
+        itemsElement.textContent = sales.reduce(
             (sum, sale) => sum + Number(sale.quantity), 0
         );
 
-        totalElement.textContent = money(total);
-        itemsElement.textContent = items;
         transactionsElement.textContent = sales.length;
     }
 
     // =====================================
-    // FINANCIAL REPORTS
+    // FINANCIAL REPORTS SECTION
     // =====================================
 
     function createFinancialReportsSection() {
@@ -1188,36 +991,20 @@ document.addEventListener("DOMContentLoaded", function () {
         dailyHeading.textContent = "Today's Financial Report";
 
         const dailyRevenue = document.createElement("p");
-        dailyRevenue.textContent = "Sales Revenue: KSh ";
-
-        const dailyRevenueValue = document.createElement("span");
-        dailyRevenueValue.id = "dailyRevenue";
-        dailyRevenueValue.textContent = "0.00";
-        dailyRevenue.appendChild(dailyRevenueValue);
+        dailyRevenue.innerHTML =
+            'Sales Revenue: KSh <span id="dailyRevenue">0.00</span>';
 
         const dailyGross = document.createElement("p");
-        dailyGross.textContent = "Known Gross Profit: KSh ";
-
-        const dailyGrossValue = document.createElement("span");
-        dailyGrossValue.id = "dailyGrossProfit";
-        dailyGrossValue.textContent = "0.00";
-        dailyGross.appendChild(dailyGrossValue);
+        dailyGross.innerHTML =
+            'Known Gross Profit: KSh <span id="dailyGrossProfit">0.00</span>';
 
         const dailyExpenses = document.createElement("p");
-        dailyExpenses.textContent = "Shop Expenses: KSh ";
-
-        const dailyExpensesValue = document.createElement("span");
-        dailyExpensesValue.id = "dailyExpenses";
-        dailyExpensesValue.textContent = "0.00";
-        dailyExpenses.appendChild(dailyExpensesValue);
+        dailyExpenses.innerHTML =
+            'Shop Expenses: KSh <span id="dailyExpenses">0.00</span>';
 
         const dailyNet = document.createElement("p");
-        dailyNet.textContent = "Known Net Profit: KSh ";
-
-        const dailyNetValue = document.createElement("span");
-        dailyNetValue.id = "dailyNetProfit";
-        dailyNetValue.textContent = "0.00";
-        dailyNet.appendChild(dailyNetValue);
+        dailyNet.innerHTML =
+            'Known Net Profit: KSh <span id="dailyNetProfit">0.00</span>';
 
         const dailyStatus = document.createElement("p");
         dailyStatus.id = "dailyProfitStatus";
@@ -1228,36 +1015,20 @@ document.addEventListener("DOMContentLoaded", function () {
         monthlyHeading.textContent = "This Month's Financial Report";
 
         const monthlyRevenue = document.createElement("p");
-        monthlyRevenue.textContent = "Sales Revenue: KSh ";
-
-        const monthlyRevenueValue = document.createElement("span");
-        monthlyRevenueValue.id = "monthlyRevenue";
-        monthlyRevenueValue.textContent = "0.00";
-        monthlyRevenue.appendChild(monthlyRevenueValue);
+        monthlyRevenue.innerHTML =
+            'Sales Revenue: KSh <span id="monthlyRevenue">0.00</span>';
 
         const monthlyGross = document.createElement("p");
-        monthlyGross.textContent = "Known Gross Profit: KSh ";
-
-        const monthlyGrossValue = document.createElement("span");
-        monthlyGrossValue.id = "monthlyGrossProfit";
-        monthlyGrossValue.textContent = "0.00";
-        monthlyGross.appendChild(monthlyGrossValue);
+        monthlyGross.innerHTML =
+            'Known Gross Profit: KSh <span id="monthlyGrossProfit">0.00</span>';
 
         const monthlyExpenses = document.createElement("p");
-        monthlyExpenses.textContent = "Shop Expenses: KSh ";
-
-        const monthlyExpensesValue = document.createElement("span");
-        monthlyExpensesValue.id = "monthlyExpenses";
-        monthlyExpensesValue.textContent = "0.00";
-        monthlyExpenses.appendChild(monthlyExpensesValue);
+        monthlyExpenses.innerHTML =
+            'Shop Expenses: KSh <span id="monthlyExpenses">0.00</span>';
 
         const monthlyNet = document.createElement("p");
-        monthlyNet.textContent = "Known Net Profit: KSh ";
-
-        const monthlyNetValue = document.createElement("span");
-        monthlyNetValue.id = "monthlyNetProfit";
-        monthlyNetValue.textContent = "0.00";
-        monthlyNet.appendChild(monthlyNetValue);
+        monthlyNet.innerHTML =
+            'Known Net Profit: KSh <span id="monthlyNetProfit">0.00</span>';
 
         const monthlyStatus = document.createElement("p");
         monthlyStatus.id = "monthlyProfitStatus";
@@ -1268,21 +1039,12 @@ document.addEventListener("DOMContentLoaded", function () {
         refreshButton.addEventListener("click", loadFinancialReports);
 
         section.append(
-            heading,
-            description,
-            dailyHeading,
-            dailyRevenue,
-            dailyGross,
-            dailyExpenses,
-            dailyNet,
-            dailyStatus,
+            heading, description,
+            dailyHeading, dailyRevenue, dailyGross,
+            dailyExpenses, dailyNet, dailyStatus,
             divider,
-            monthlyHeading,
-            monthlyRevenue,
-            monthlyGross,
-            monthlyExpenses,
-            monthlyNet,
-            monthlyStatus,
+            monthlyHeading, monthlyRevenue, monthlyGross,
+            monthlyExpenses, monthlyNet, monthlyStatus,
             refreshButton
         );
 
@@ -1295,14 +1057,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function loadFinancialReports() {
         const ids = [
-            "dailyRevenue",
-            "dailyGrossProfit",
-            "dailyExpenses",
-            "dailyNetProfit",
-            "monthlyRevenue",
-            "monthlyGrossProfit",
-            "monthlyExpenses",
-            "monthlyNetProfit"
+            "dailyRevenue", "dailyGrossProfit", "dailyExpenses",
+            "dailyNetProfit", "monthlyRevenue", "monthlyGrossProfit",
+            "monthlyExpenses", "monthlyNetProfit"
         ];
 
         ids.forEach(id => {
@@ -1317,11 +1074,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const [salesResult, expensesResult] = await Promise.all([
-                db.from("sales")
-                    .select("created_at, quantity, total, cost_price"),
-
-                db.from("expenses")
-                    .select("created_at, amount")
+                db.from("sales").select("created_at, quantity, total, cost_price"),
+                db.from("expenses").select("created_at, amount")
             ]);
 
             if (salesResult.error) throw salesResult.error;
@@ -1344,10 +1098,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
                     revenue += total;
 
-                    if (
-                        sale.cost_price === null ||
-                        sale.cost_price === undefined
-                    ) {
+                    if (sale.cost_price === null ||
+                        sale.cost_price === undefined) {
                         missingCostSales++;
                     } else {
                         grossProfit += total -
@@ -1356,9 +1108,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
 
                 const expenseTotal = periodExpenses.reduce(
-                    (sum, expense) =>
-                        sum + Number(expense.amount || 0),
-                    0
+                    (sum, expense) => sum + Number(expense.amount || 0), 0
                 );
 
                 return {
@@ -1390,30 +1140,17 @@ document.addEventListener("DOMContentLoaded", function () {
             const monthly = calculatePeriod(monthlySales, monthlyExpenses);
 
             function displayReport(prefix, report) {
-                get(prefix + "Revenue").textContent =
-                    money(report.revenue);
-
-                get(prefix + "GrossProfit").textContent =
-                    money(report.grossProfit);
-
-                get(prefix + "Expenses").textContent =
-                    money(report.expenses);
-
-                get(prefix + "NetProfit").textContent =
-                    money(report.netProfit);
+                get(prefix + "Revenue").textContent = money(report.revenue);
+                get(prefix + "GrossProfit").textContent = money(report.grossProfit);
+                get(prefix + "Expenses").textContent = money(report.expenses);
+                get(prefix + "NetProfit").textContent = money(report.netProfit);
 
                 const status = get(prefix + "ProfitStatus");
 
-                if (report.missingCostSales > 0) {
-                    status.textContent =
-                        "INCOMPLETE: " +
-                        report.missingCostSales +
-                        " sale(s) have no recorded buying cost. " +
-                        "Gross and net profit show known amounts only.";
-                } else {
-                    status.textContent =
-                        "Complete: buying costs are recorded for all sales.";
-                }
+                status.textContent = report.missingCostSales > 0
+                    ? "INCOMPLETE: " + report.missingCostSales +
+                      " sale(s) have no recorded buying cost. Profit shows known amounts only."
+                    : "Complete: buying costs are recorded for all sales.";
             }
 
             displayReport("daily", daily);
@@ -1424,14 +1161,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (dailyStatus) {
                 dailyStatus.textContent =
-                    "Could not load daily financial report: " +
-                    error.message;
+                    "Could not load daily report: " + error.message;
             }
 
             if (monthlyStatus) {
                 monthlyStatus.textContent =
-                    "Could not load monthly financial report: " +
-                    error.message;
+                    "Could not load monthly report: " + error.message;
             }
 
             ids.forEach(id => {
@@ -1469,7 +1204,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             showDashboard(true);
-
             createFinancialReportsSection();
 
             await loadOrders();
@@ -1486,7 +1220,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // INITIAL START
     startDashboard();
 
 });
