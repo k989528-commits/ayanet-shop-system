@@ -1,4 +1,3 @@
-
 /* =====================================
    AYANET ADMIN DASHBOARD
    PRODUCTS + BUYING COST + SELLING PRICE
@@ -8,6 +7,8 @@
    SERVICE MANAGEMENT
    COMPLETED ORDER DELETION
    PRINTING DOCUMENT VIEW / DOWNLOAD
+   NEW ORDER BEEP + AUTOMATIC REFRESH
+   PAYMENT DETAILS + WHATSAPP + SMS
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -298,8 +299,184 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================
-    // CUSTOMER ORDERS
+    // CUSTOMER ORDERS + NEW ORDER ALERTS
     // =====================================
+
+    let knownOrderIds = new Set();
+    let ordersLoadedOnce = false;
+    let orderCheckTimer = null;
+    let orderAudioContext = null;
+    let orderAlertsEnabled = false;
+    let orderLoadInProgress = false;
+
+    function playOrderBeep() {
+        if (!orderAlertsEnabled) return;
+
+        try {
+            const AudioContextClass =
+                window.AudioContext || window.webkitAudioContext;
+
+            if (!AudioContextClass) return;
+
+            if (!orderAudioContext) {
+                orderAudioContext = new AudioContextClass();
+            }
+
+            if (orderAudioContext.state === "suspended") {
+                orderAudioContext.resume();
+            }
+
+            const oscillator = orderAudioContext.createOscillator();
+            const gain = orderAudioContext.createGain();
+
+            oscillator.type = "sine";
+            oscillator.frequency.value = 880;
+
+            gain.gain.setValueAtTime(
+                0.0001,
+                orderAudioContext.currentTime
+            );
+
+            gain.gain.exponentialRampToValueAtTime(
+                0.25,
+                orderAudioContext.currentTime + 0.03
+            );
+
+            gain.gain.exponentialRampToValueAtTime(
+                0.0001,
+                orderAudioContext.currentTime + 0.45
+            );
+
+            oscillator.connect(gain);
+            gain.connect(orderAudioContext.destination);
+
+            oscillator.start();
+            oscillator.stop(orderAudioContext.currentTime + 0.5);
+
+        } catch (error) {
+            console.error("Order beep error:", error);
+        }
+    }
+
+    function notifyNewOrder(order) {
+        playOrderBeep();
+
+        if ("Notification" in window &&
+            Notification.permission === "granted") {
+
+            try {
+                new Notification("New AYANET Customer Order", {
+                    body:
+                        (order.customer_name || "Customer") +
+                        " has placed an order.",
+                    icon: "../admin/icon-192.png"
+                });
+            } catch (error) {
+                console.error("Notification error:", error);
+            }
+        }
+    }
+
+    async function enableOrderAlerts() {
+        const button = get("enableOrderSound");
+        const status = get("orderAlertStatus");
+
+        try {
+            const AudioContextClass =
+                window.AudioContext || window.webkitAudioContext;
+
+            if (AudioContextClass) {
+                if (!orderAudioContext) {
+                    orderAudioContext = new AudioContextClass();
+                }
+
+                if (orderAudioContext.state === "suspended") {
+                    await orderAudioContext.resume();
+                }
+
+                orderAlertsEnabled = true;
+                playOrderBeep();
+            } else {
+                status.textContent =
+                    "This browser does not support computer sound alerts.";
+            }
+
+            if ("Notification" in window) {
+                if (Notification.permission === "default") {
+                    await Notification.requestPermission();
+                }
+            }
+
+            if (orderAlertsEnabled) {
+                status.textContent =
+                    "Order sound alerts are enabled. Keep this dashboard open.";
+                button.textContent = "Order Alerts Enabled";
+            }
+
+        } catch (error) {
+            console.error("Could not enable order alerts:", error);
+            status.textContent =
+                "Could not enable sound alerts. Check your browser settings.";
+        }
+    }
+
+    const enableOrderSoundButton = get("enableOrderSound");
+
+    if (enableOrderSoundButton) {
+        enableOrderSoundButton.addEventListener(
+            "click",
+            enableOrderAlerts
+        );
+    }
+
+    function getCustomerPhone(phone) {
+        let number = String(phone || "").replace(/\D/g, "");
+
+        if (number.startsWith("0")) {
+            number = "254" + number.substring(1);
+        } else if (number.startsWith("7") || number.startsWith("1")) {
+            number = "254" + number;
+        }
+
+        return number;
+    }
+
+    function getReadyMessage(order) {
+        const customerName = order.customer_name || "Customer";
+
+        return "Hello " + customerName +
+            "! Your order from AYANET is ready for collection. " +
+            "Thank you for choosing AYANET!";
+    }
+
+    function sendReadyWhatsApp(order) {
+        const phone = getCustomerPhone(order.customer_phone);
+
+        if (!phone || phone.length < 10) {
+            alert("This order does not have a valid customer phone number.");
+            return;
+        }
+
+        const message = encodeURIComponent(getReadyMessage(order));
+        const whatsappUrl =
+            "https://wa.me/" + phone + "?text=" + message;
+
+        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+    }
+
+    function sendReadySMS(order) {
+        const phone = getCustomerPhone(order.customer_phone);
+
+        if (!phone || phone.length < 10) {
+            alert("This order does not have a valid customer phone number.");
+            return;
+        }
+
+        const message = encodeURIComponent(getReadyMessage(order));
+        const smsUrl = "sms:" + phone + "?body=" + message;
+
+        window.open(smsUrl, "_blank");
+    }
 
     async function openPrintingDocument(order, button) {
         if (!order.document_url) {
@@ -346,81 +523,175 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function loadOrders() {
+        if (orderLoadInProgress) return;
+
+        orderLoadInProgress = true;
+
         const container = get("orders");
 
-        const { data, error } = await db.from("orders")
-            .select("*")
-            .order("created_at", { ascending: false });
+        try {
+            const { data, error } = await db.from("orders")
+                .select("*")
+                .order("created_at", { ascending: false });
 
-        if (error) {
-            container.textContent = "Failed to load orders: " + error.message;
-            return;
-        }
+            if (error) {
+                container.textContent =
+                    "Failed to load orders: " + error.message;
+                return;
+            }
 
-        container.innerHTML = "";
+            const orders = data || [];
 
-        if (!data || data.length === 0) {
-            container.textContent = "No customer orders yet.";
-            return;
-        }
-
-        data.forEach(order => {
-            const card = document.createElement("div");
-            card.className = "order-card";
-
-            const heading = document.createElement("h3");
-            heading.textContent = order.customer_name || "Customer";
-
-            const phone = document.createElement("p");
-            phone.textContent = "Phone: " + (order.customer_phone || "");
-
-            const service = document.createElement("p");
-            service.textContent = "Service: " + (order.service_name || "");
-
-            const details = document.createElement("p");
-            details.textContent = "Details: " + (order.order_details || "");
-
-            const status = document.createElement("p");
-            status.textContent = "Status: " + (order.status || "Pending");
-
-            card.append(heading, phone, service, details, status);
-
-            if (order.document_url) {
-                const documentInfo = document.createElement("p");
-                documentInfo.textContent =
-                    "Printing document: " +
-                    (order.document_name || "Customer document");
-
-                const documentButton = document.createElement("button");
-                documentButton.type = "button";
-                documentButton.textContent = "View / Download Document";
-                documentButton.addEventListener("click", function () {
-                    openPrintingDocument(order, documentButton);
+            if (!ordersLoadedOnce) {
+                orders.forEach(order => {
+                    knownOrderIds.add(String(order.id));
                 });
 
-                card.append(documentInfo, documentButton);
-            }
-
-            if (order.status === "Completed") {
-                const completed = document.createElement("p");
-                completed.textContent = "Order completed!";
-                card.appendChild(completed);
-
-                const deleteButton = document.createElement("button");
-                deleteButton.type = "button";
-                deleteButton.textContent = "Delete Completed Order";
-                deleteButton.onclick = () => deleteCompletedOrder(order.id);
-                card.appendChild(deleteButton);
+                ordersLoadedOnce = true;
 
             } else {
-                const button = document.createElement("button");
-                button.textContent = "Mark as Completed";
-                button.onclick = () => completeOrder(order.id);
-                card.appendChild(button);
+                orders.forEach(order => {
+                    const orderId = String(order.id);
+
+                    if (!knownOrderIds.has(orderId)) {
+                        knownOrderIds.add(orderId);
+                        notifyNewOrder(order);
+                    }
+                });
             }
 
-            container.appendChild(card);
-        });
+            container.innerHTML = "";
+
+            if (orders.length === 0) {
+                container.textContent = "No customer orders yet.";
+                return;
+            }
+
+            orders.forEach(order => {
+                const card = document.createElement("div");
+                card.className = "order-card";
+
+                const heading = document.createElement("h3");
+                heading.textContent = order.customer_name || "Customer";
+
+                const phone = document.createElement("p");
+                phone.textContent =
+                    "Phone: " + (order.customer_phone || "Not provided");
+
+                const service = document.createElement("p");
+                service.textContent =
+                    "Service: " + (order.service_name || "");
+
+                const details = document.createElement("p");
+                details.textContent =
+                    "Details: " + (order.order_details || "");
+
+                const status = document.createElement("p");
+                status.textContent =
+                    "Status: " + (order.status || "Pending");
+
+                const paymentMethod = document.createElement("p");
+                paymentMethod.textContent =
+                    "Payment method: " +
+                    (order.payment_method || "Not recorded");
+
+                const paymentStatus = document.createElement("p");
+                paymentStatus.textContent =
+                    "Payment status: " +
+                    (order.payment_status || "Not recorded");
+
+                const mpesaCode = document.createElement("p");
+                mpesaCode.textContent =
+                    "M-Pesa confirmation code: " +
+                    (order.mpesa_code || "Not provided");
+
+                card.append(
+                    heading,
+                    phone,
+                    service,
+                    details,
+                    status,
+                    paymentMethod,
+                    paymentStatus,
+                    mpesaCode
+                );
+
+                if (order.document_url) {
+                    const documentInfo = document.createElement("p");
+                    documentInfo.textContent =
+                        "Printing document: " +
+                        (order.document_name || "Customer document");
+
+                    const documentButton = document.createElement("button");
+                    documentButton.type = "button";
+                    documentButton.textContent =
+                        "View / Download Document";
+
+                    documentButton.addEventListener("click", function () {
+                        openPrintingDocument(order, documentButton);
+                    });
+
+                    card.append(documentInfo, documentButton);
+                }
+
+                if (order.status === "Completed") {
+                    const completed = document.createElement("p");
+                    completed.textContent = "Order completed!";
+                    card.appendChild(completed);
+
+                    const whatsappButton = document.createElement("button");
+                    whatsappButton.type = "button";
+                    whatsappButton.textContent = "Message on WhatsApp";
+                    whatsappButton.onclick =
+                        () => sendReadyWhatsApp(order);
+
+                    const smsButton = document.createElement("button");
+                    smsButton.type = "button";
+                    smsButton.textContent = "Send SMS";
+                    smsButton.onclick =
+                        () => sendReadySMS(order);
+
+                    const deleteButton = document.createElement("button");
+                    deleteButton.type = "button";
+                    deleteButton.textContent = "Delete Completed Order";
+                    deleteButton.onclick =
+                        () => deleteCompletedOrder(order.id);
+
+                    card.append(
+                        whatsappButton,
+                        smsButton,
+                        deleteButton
+                    );
+
+                } else {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.textContent = "Mark as Completed";
+                    button.onclick = () => completeOrder(order.id);
+                    card.appendChild(button);
+                }
+
+                container.appendChild(card);
+            });
+
+        } catch (error) {
+            console.error("Order loading error:", error);
+            container.textContent =
+                "Could not load orders: " + error.message;
+
+        } finally {
+            orderLoadInProgress = false;
+        }
+    }
+
+    function startOrderMonitoring() {
+        if (orderCheckTimer) {
+            clearInterval(orderCheckTimer);
+        }
+
+        orderCheckTimer = setInterval(function () {
+            loadOrders();
+        }, 15000);
     }
 
     async function completeOrder(orderId) {
@@ -434,6 +705,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         await loadOrders();
+
+        alert(
+            "Order marked as completed!\n\n" +
+            "You can now use the WhatsApp or SMS button to notify the customer."
+        );
     }
 
     async function deleteCompletedOrder(orderId) {
@@ -553,24 +829,33 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = product.name;
 
             const description = document.createElement("p");
-            description.textContent = "Description: " + (product.description || "");
+            description.textContent =
+                "Description: " + (product.description || "");
 
             const cost = document.createElement("p");
             const price = document.createElement("p");
             const profit = document.createElement("p");
 
-            price.textContent = "Selling price: KSh " + money(product.price);
+            price.textContent =
+                "Selling price: KSh " + money(product.price);
 
-            if (product.cost_price !== null && product.cost_price !== undefined) {
+            if (product.cost_price !== null &&
+                product.cost_price !== undefined) {
                 const buyingCost = Number(product.cost_price);
                 const sellingPrice = Number(product.price);
 
-                cost.textContent = "Average buying cost: KSh " + money(buyingCost);
-                profit.textContent = "Profit per item: KSh " +
+                cost.textContent =
+                    "Average buying cost: KSh " + money(buyingCost);
+
+                profit.textContent =
+                    "Profit per item: KSh " +
                     money(sellingPrice - buyingCost);
             } else {
-                cost.textContent = "Average buying cost: Not entered yet";
-                profit.textContent = "Profit per item: Not available";
+                cost.textContent =
+                    "Average buying cost: Not entered yet";
+
+                profit.textContent =
+                    "Profit per item: Not available";
             }
 
             const stock = document.createElement("p");
@@ -596,7 +881,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const deleteButton = document.createElement("button");
             deleteButton.textContent = "Delete Product";
-            deleteButton.onclick = () => deleteProduct(product.id, product.name);
+            deleteButton.onclick =
+                () => deleteProduct(product.id, product.name);
 
             card.append(
                 heading, description, cost, price, profit,
@@ -748,7 +1034,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            get("productMessage").textContent = "Product updated successfully!";
+            get("productMessage").textContent =
+                "Product updated successfully!";
+
             await loadProducts();
         };
 
@@ -760,7 +1048,9 @@ document.addEventListener("DOMContentLoaded", function () {
     // =====================================
 
     async function deleteProduct(productId, productName) {
-        if (!confirm('Are you sure you want to delete "' + productName + '"?')) {
+        if (!confirm(
+            'Are you sure you want to delete "' + productName + '"?'
+        )) {
             return;
         }
 
@@ -773,7 +1063,9 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        get("productMessage").textContent = "Product deleted successfully!";
+        get("productMessage").textContent =
+            "Product deleted successfully!";
+
         await loadProducts();
     }
 
@@ -789,7 +1081,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const message = get("saleMessage");
 
         if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-            message.textContent = "Select a product and enter a valid quantity.";
+            message.textContent =
+                "Select a product and enter a valid quantity.";
             return;
         }
 
@@ -808,7 +1101,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            message.textContent = "Sale recorded successfully! Stock reduced.";
+            message.textContent =
+                "Sale recorded successfully! Stock reduced.";
+
             this.reset();
 
             await loadProducts();
@@ -841,7 +1136,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (!description || !category || amountInput === "" ||
             !Number.isFinite(amount) || amount <= 0) {
-            message.textContent = "Enter a description, category and valid amount.";
+            message.textContent =
+                "Enter a description, category and valid amount.";
             return;
         }
 
@@ -858,7 +1154,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }]);
 
             if (error) {
-                message.textContent = "Failed to record expense: " + error.message;
+                message.textContent =
+                    "Failed to record expense: " + error.message;
                 return;
             }
 
@@ -889,7 +1186,8 @@ document.addEventListener("DOMContentLoaded", function () {
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent = "Failed to load expenses: " + error.message;
+            container.textContent =
+                "Failed to load expenses: " + error.message;
             console.error(error.message);
             return;
         }
@@ -909,10 +1207,12 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = expense.description;
 
             const category = document.createElement("p");
-            category.textContent = "Category: " + (expense.category || "Other");
+            category.textContent =
+                "Category: " + (expense.category || "Other");
 
             const amount = document.createElement("p");
-            amount.textContent = "Amount: KSh " + money(expense.amount);
+            amount.textContent =
+                "Amount: KSh " + money(expense.amount);
 
             const date = document.createElement("p");
             date.textContent = "Date: " +
@@ -937,7 +1237,8 @@ document.addEventListener("DOMContentLoaded", function () {
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent = "Failed to load sales: " + error.message;
+            container.textContent =
+                "Failed to load sales: " + error.message;
             return;
         }
 
@@ -959,22 +1260,33 @@ document.addEventListener("DOMContentLoaded", function () {
             quantity.textContent = "Quantity sold: " + sale.quantity;
 
             const price = document.createElement("p");
-            price.textContent = "Selling price per item: KSh " + money(sale.price);
+            price.textContent =
+                "Selling price per item: KSh " + money(sale.price);
 
             const total = document.createElement("p");
-            total.textContent = "Sales total: KSh " + money(sale.total);
+            total.textContent =
+                "Sales total: KSh " + money(sale.total);
 
             const cost = document.createElement("p");
             const profit = document.createElement("p");
 
-            if (sale.cost_price !== null && sale.cost_price !== undefined) {
-                const costTotal = Number(sale.cost_price) * Number(sale.quantity);
-                cost.textContent = "Buying cost: KSh " + money(costTotal);
-                profit.textContent = "Gross profit: KSh " +
+            if (sale.cost_price !== null &&
+                sale.cost_price !== undefined) {
+                const costTotal =
+                    Number(sale.cost_price) * Number(sale.quantity);
+
+                cost.textContent =
+                    "Buying cost: KSh " + money(costTotal);
+
+                profit.textContent =
+                    "Gross profit: KSh " +
                     money(Number(sale.total) - costTotal);
             } else {
-                cost.textContent = "Buying cost: Not recorded for this sale";
-                profit.textContent = "Gross profit: Not available";
+                cost.textContent =
+                    "Buying cost: Not recorded for this sale";
+
+                profit.textContent =
+                    "Gross profit: Not available";
             }
 
             const date = document.createElement("p");
@@ -983,7 +1295,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     "en-KE", { timeZone: SHOP_TIMEZONE }
                 );
 
-            card.append(heading, quantity, price, total, cost, profit, date);
+            card.append(
+                heading, quantity, price, total, cost, profit, date
+            );
+
             container.appendChild(card);
         });
     }
@@ -1009,6 +1324,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const todayKey = getKenyaDateKey(new Date());
+
         const sales = (data || []).filter(sale =>
             getKenyaDateKey(new Date(sale.created_at)) === todayKey
         );
@@ -1045,6 +1361,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const monthKey = getKenyaMonthKey(new Date());
+
         const sales = (data || []).filter(sale =>
             getKenyaMonthKey(new Date(sale.created_at)) === monthKey
         );
@@ -1164,7 +1481,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const [salesResult, expensesResult] = await Promise.all([
-                db.from("sales").select("created_at, quantity, total, cost_price"),
+                db.from("sales").select(
+                    "created_at, quantity, total, cost_price"
+                ),
                 db.from("expenses").select("created_at, amount")
             ]);
 
@@ -1198,7 +1517,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
 
                 const expenseTotal = periodExpenses.reduce(
-                    (sum, expense) => sum + Number(expense.amount || 0), 0
+                    (sum, expense) =>
+                        sum + Number(expense.amount || 0), 0
                 );
 
                 return {
@@ -1230,10 +1550,17 @@ document.addEventListener("DOMContentLoaded", function () {
             const monthly = calculatePeriod(monthlySales, monthlyExpenses);
 
             function displayReport(prefix, report) {
-                get(prefix + "Revenue").textContent = money(report.revenue);
-                get(prefix + "GrossProfit").textContent = money(report.grossProfit);
-                get(prefix + "Expenses").textContent = money(report.expenses);
-                get(prefix + "NetProfit").textContent = money(report.netProfit);
+                get(prefix + "Revenue").textContent =
+                    money(report.revenue);
+
+                get(prefix + "GrossProfit").textContent =
+                    money(report.grossProfit);
+
+                get(prefix + "Expenses").textContent =
+                    money(report.expenses);
+
+                get(prefix + "NetProfit").textContent =
+                    money(report.netProfit);
 
                 const status = get(prefix + "ProfitStatus");
 
@@ -1271,6 +1598,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     get("logoutButton").addEventListener("click", async function () {
         await db.auth.signOut();
+
+        if (orderCheckTimer) {
+            clearInterval(orderCheckTimer);
+            orderCheckTimer = null;
+        }
+
         showDashboard(false);
     });
 
@@ -1297,6 +1630,8 @@ document.addEventListener("DOMContentLoaded", function () {
             createFinancialReportsSection();
 
             await loadOrders();
+            startOrderMonitoring();
+
             await loadServices();
             await loadProducts();
             await loadSales();
