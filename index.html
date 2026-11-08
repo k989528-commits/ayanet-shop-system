@@ -68,6 +68,7 @@ textarea{min-height:100px;resize:vertical}
 .payment-number{font-size:25px;font-weight:bold;color:#137547;letter-spacing:1px;margin:8px 0}
 .payment-box p{font-size:14px;line-height:1.7;color:#475569}
 .payment-warning{margin-top:12px;padding:10px;background:#fff0d1;border-radius:7px;color:#805500;font-size:13px;line-height:1.5}
+.payment-note{background:#eef4fb;border-radius:8px;padding:13px;margin-top:12px;color:#334155;font-size:14px;line-height:1.6}
 button:disabled{opacity:.6;cursor:not-allowed}
 footer{background:#102b50;color:white;text-align:center;padding:25px 15px;line-height:1.8}
 footer strong{color:#f4c542}
@@ -140,7 +141,19 @@ footer strong{color:#f4c542}
 <input type="number" id="printCopies" min="1" max="500" value="1">
 </div>
 
-<div class="payment-box">
+<label for="paymentMethod">Choose How You Want to Pay</label>
+<select id="paymentMethod" required>
+<option value="">-- Select Payment Method --</option>
+<option value="Pay now - M-Pesa Pochi la Biashara">Pay now - M-Pesa</option>
+<option value="Pay on pickup">Pay on pickup</option>
+<option value="Pay on delivery">Pay on delivery</option>
+</select>
+
+<div id="paymentNote" class="payment-note">
+Please select your preferred payment method.
+</div>
+
+<div class="payment-box" id="paymentBox" style="display:none">
 <h3>💳 PAY WITH M-PESA</h3>
 <p><strong>Payment method:</strong> Lipa na M-Pesa – Pochi la Biashara</p>
 <p><strong>Business name:</strong> Sonita Letikirich</p>
@@ -157,6 +170,7 @@ Please check the business name and amount before confirming your payment. AYANET
 </div>
 </div>
 
+<div id="mpesaCodeField" style="display:none">
 <label for="mpesaCode">M-Pesa Confirmation Code</label>
 <input
 type="text"
@@ -164,8 +178,8 @@ id="mpesaCode"
 placeholder="Enter your M-Pesa transaction code"
 maxlength="20"
 autocomplete="off"
-required
 >
+</div>
 
 <label for="orderDetails">Order Details</label>
 <textarea id="orderDetails" placeholder="Additional instructions or details..." required></textarea>
@@ -205,6 +219,10 @@ const printingDocument=document.getElementById("printingDocument");
 const printType=document.getElementById("printType");
 const printCopies=document.getElementById("printCopies");
 const mpesaCodeInput=document.getElementById("mpesaCode");
+const paymentMethod=document.getElementById("paymentMethod");
+const paymentBox=document.getElementById("paymentBox");
+const mpesaCodeField=document.getElementById("mpesaCodeField");
+const paymentNote=document.getElementById("paymentNote");
 
 let availableServices=[];
 let availableProducts=[];
@@ -230,6 +248,28 @@ String(service.category||"").toLowerCase().includes("print")||
 String(service.service_name||"").toLowerCase().includes("print")
 );
 }
+
+function updatePaymentFields(){
+
+const choice=paymentMethod.value;
+const payNow=choice==="Pay now - M-Pesa Pochi la Biashara";
+
+paymentBox.style.display=payNow?"block":"none";
+mpesaCodeField.style.display=payNow?"block":"none";
+mpesaCodeInput.required=payNow;
+
+if(payNow){
+paymentNote.textContent="Please pay using Pochi la Biashara and enter your M-Pesa confirmation code below. Your payment will be verified by AYANET.";
+}else if(choice==="Pay on pickup"){
+paymentNote.textContent="You can pay when you arrive to collect your order. No M-Pesa code is needed now.";
+}else if(choice==="Pay on delivery"){
+paymentNote.textContent="You can pay when your order is delivered. No M-Pesa code is needed now.";
+}else{
+paymentNote.textContent="Please select your preferred payment method.";
+}
+}
+
+paymentMethod.addEventListener("change",updatePaymentFields);
 
 function updatePrintingFields(){
 const service=availableServices.find(
@@ -528,6 +568,13 @@ event.preventDefault();
 
 const selected=availableServices.find(item=>String(item.id)===serviceSelect.value);
 const printing=isPrintingService(selected);
+const chosenPayment=paymentMethod.value;
+const payNow=chosenPayment==="Pay now - M-Pesa Pochi la Biashara";
+
+if(!chosenPayment){
+showMessage("Please choose how you want to pay.","red");
+return;
+}
 
 if(!selected&&cart.length===0){
 showMessage("Please select a service or add a product to your cart.","red");
@@ -549,7 +596,7 @@ showMessage("Please complete all required fields.","red");
 return;
 }
 
-if(!/^[A-Z0-9]{6,20}$/.test(mpesaCode)){
+if(payNow&&!/^[A-Z0-9]{6,20}$/.test(mpesaCode)){
 showMessage("Please enter a valid M-Pesa confirmation code (6–20 letters or numbers).","red");
 return;
 }
@@ -590,6 +637,8 @@ showMessage("","");
 let orderDescription="";
 let uploadedPath=null;
 
+orderDescription+="PAYMENT METHOD: "+chosenPayment+"\n";
+
 if(selected){
 orderDescription+="SERVICE: "+selected.category+" - "+selected.service_name+
 " | Price: KSh "+money(selected.price)+"\n";
@@ -615,11 +664,17 @@ orderDescription+="PRODUCT TOTAL: KSh "+money(total)+"\n";
 }
 
 orderDescription+="CUSTOMER DETAILS: "+details+"\n";
+
+if(payNow){
 orderDescription+="PAYMENT METHOD: Pochi la Biashara\n";
 orderDescription+="POCHI BUSINESS: Sonita Letikirich\n";
 orderDescription+="POCHI NUMBER: 0743431448\n";
 orderDescription+="MPESA CONFIRMATION CODE: "+mpesaCode+"\n";
 orderDescription+="PAYMENT STATUS: PENDING VERIFICATION";
+}else{
+orderDescription+="PAYMENT STATUS: PAYMENT DUE\n";
+orderDescription+="CUSTOMER WILL PAY: "+chosenPayment;
+}
 
 try{
 
@@ -668,7 +723,7 @@ customer_phone:phone,
 service_name:selected.category+" - "+selected.service_name+
 " (KSh "+money(selected.price)+")",
 order_details:orderDescription,
-mpesa_code:mpesaCode,
+mpesa_code:payNow?mpesaCode:null,
 payment_status:"Pending"
 };
 
@@ -686,7 +741,7 @@ if(error)throw error;
 }
 
 showMessage(
-"Your order has been submitted successfully! Your payment is pending verification. Thank you for choosing AYANET.",
+"Your order has been submitted successfully! Payment method: "+chosenPayment+". AYANET will confirm your order. Thank you for choosing AYANET.",
 "green"
 );
 
@@ -696,6 +751,7 @@ renderCart();
 selectedPrice.textContent="";
 printingFields.classList.remove("visible");
 printingDocument.required=false;
+updatePaymentFields();
 
 await loadProducts();
 
@@ -727,6 +783,7 @@ button.textContent="SUBMIT ORDER";
 
 });
 
+updatePaymentFields();
 loadServices();
 loadProducts();
 
