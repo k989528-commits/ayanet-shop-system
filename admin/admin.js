@@ -1,3 +1,4 @@
+
 /* =====================================
    AYANET ADMIN DASHBOARD
    PRODUCTS + BUYING COST + SELLING PRICE
@@ -52,6 +53,32 @@ document.addEventListener("DOMContentLoaded", function () {
         const month = parts.find(p => p.type === "month").value;
 
         return year + "-" + month;
+    }
+
+    // =====================================
+    // COUNT REAL TRANSACTIONS
+    // One receipt number = one transaction.
+    // Old sales without receipt numbers count
+    // individually, one sale row per transaction.
+    // =====================================
+
+    function countTransactions(sales) {
+        const receiptNumbers = new Set();
+        let olderTransactions = 0;
+
+        sales.forEach(sale => {
+            const receiptNumber = String(
+                sale.receipt_number || ""
+            ).trim();
+
+            if (receiptNumber) {
+                receiptNumbers.add(receiptNumber);
+            } else {
+                olderTransactions++;
+            }
+        });
+
+        return receiptNumbers.size + olderTransactions;
     }
 
     function showDashboard(isLoggedIn) {
@@ -1313,7 +1340,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const transactionsElement = get("transactionsToday");
 
         const { data, error } = await db.from("sales")
-            .select("created_at, quantity, total");
+            .select("id, created_at, quantity, total, receipt_number");
 
         if (error) {
             totalElement.textContent = "Could not load";
@@ -1337,7 +1364,7 @@ document.addEventListener("DOMContentLoaded", function () {
             (sum, sale) => sum + Number(sale.quantity), 0
         );
 
-        transactionsElement.textContent = sales.length;
+        transactionsElement.textContent = countTransactions(sales);
     }
 
     // =====================================
@@ -1350,7 +1377,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const transactionsElement = get("transactionsMonth");
 
         const { data, error } = await db.from("sales")
-            .select("created_at, quantity, total");
+            .select("id, created_at, quantity, total, receipt_number");
 
         if (error) {
             totalElement.textContent = "Could not load";
@@ -1374,7 +1401,7 @@ document.addEventListener("DOMContentLoaded", function () {
             (sum, sale) => sum + Number(sale.quantity), 0
         );
 
-        transactionsElement.textContent = sales.length;
+        transactionsElement.textContent = countTransactions(sales);
     }
 
     // =====================================
