@@ -5,13 +5,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AYANET Admin Dashboard</title>
+
     <link rel="stylesheet" href="admin.css">
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 
     <div id="loginSection">
         <h1>AYANET Admin Login</h1>
+
         <form id="adminLoginForm">
             <label for="adminEmail">Email</label>
             <input type="email" id="adminEmail" required>
@@ -44,6 +48,7 @@
                 <p>Add service categories, services and customer prices.</p>
 
                 <h3>Add a Service</h3>
+
                 <form id="serviceForm">
                     <label for="serviceCategory">Service Category</label>
                     <input type="text" id="serviceCategory" required>
@@ -108,6 +113,7 @@
 
             <section id="salesSection">
                 <h2>Record a Sale</h2>
+
                 <form id="saleForm">
                     <label for="saleProduct">Select Product</label>
                     <select id="saleProduct" required>
@@ -117,13 +123,63 @@
                     <label for="saleQuantity">Quantity</label>
                     <input type="number" id="saleQuantity" min="1" required>
 
-                    <button type="submit">Record Sale</button>
+                    <button type="submit">Record Single-Product Sale</button>
                     <p id="saleMessage"></p>
                 </form>
+
+                <hr>
+
+                <section id="salesCartSection">
+                    <h2>Multi-Product Sales Cart</h2>
+                    <p>Add several products to one customer receipt.</p>
+
+                    <label for="cartCustomerName">Customer Name (Optional)</label>
+                    <input
+                        type="text"
+                        id="cartCustomerName"
+                        maxlength="100"
+                        placeholder="Customer name"
+                    >
+
+                    <label for="cartProduct">Choose Product</label>
+                    <select id="cartProduct">
+                        <option value="">Choose a product</option>
+                    </select>
+
+                    <label for="cartQuantity">Quantity</label>
+                    <input
+                        type="number"
+                        id="cartQuantity"
+                        min="1"
+                        step="1"
+                        value="1"
+                    >
+
+                    <button type="button" id="addCartItemButton">
+                        Add to Cart
+                    </button>
+
+                    <h3>Cart Items</h3>
+                    <div id="salesCartItems">
+                        No products added yet.
+                    </div>
+
+                    <h3>
+                        Grand Total: KSh
+                        <span id="salesCartTotal">0.00</span>
+                    </h3>
+
+                    <button type="button" id="completeCartSaleButton">
+                        Complete Sale & Download Receipt
+                    </button>
+
+                    <p id="cartSaleMessage"></p>
+                </section>
             </section>
 
             <section id="expensesSection">
                 <h2>Shop Expenses</h2>
+
                 <form id="expenseForm">
                     <label for="expenseDescription">Expense Description</label>
                     <input type="text" id="expenseDescription" required>
@@ -172,8 +228,9 @@
         </main>
     </div>
 
-    <script src="admin.js?v=20261108-1"></script>
+    <script src="admin.js?v=20261117-1"></script>
     <script src="product-photos.js?v=20261107-2"></script>
+    <script src="sales-cart.js?v=20261117-1"></script>
 
 </body>
 </html>
