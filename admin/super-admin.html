@@ -1,0 +1,221 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYANET Super Admin Control Centre</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#eef2f7;color:#17243b;font-family:Arial,sans-serif}
+header{background:#101d35;color:white;padding:25px;text-align:center;border-bottom:5px solid #c9a227}
+header h1{margin:0;color:#e4bd50}
+main{max-width:1000px;margin:25px auto;padding:15px}
+.panel{background:white;padding:22px;margin-bottom:20px;border-radius:12px;box-shadow:0 3px 12px #00000012}
+h2{color:#14294b}
+label{display:block;margin:12px 0 6px;font-weight:bold}
+input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:6px}
+button{padding:11px 16px;border:0;border-radius:6px;background:#14294b;color:white;cursor:pointer;margin:5px 5px 5px 0}
+button:hover{opacity:.88}
+.gold{background:#c49a22;color:#101d35;font-weight:bold}
+.red{background:#a52a2a}
+.hidden{display:none}
+.message{padding:10px;background:#f1f5f9;border-radius:6px;overflow-wrap:anywhere}
+.shop{border:1px solid #d8dee8;padding:16px;border-radius:9px;margin:12px 0}
+.shop h3{margin-top:0}
+.status{font-weight:bold}
+footer{text-align:center;padding:20px;color:#64748b}
+</style>
+</head>
+<body>
+
+<header>
+<h1>AYANET</h1>
+<h2 style="color:white">SUPER ADMIN CONTROL CENTRE</h2>
+<p>Multi-Shop Management Platform</p>
+</header>
+
+<main>
+<section class="panel" id="loginPanel">
+<h2>Administrator Login</h2>
+<form id="loginForm">
+<label for="email">Administrator Email</label>
+<input id="email" type="email" required>
+<label for="password">Password</label>
+<input id="password" type="password" required>
+<br><br>
+<button class="gold" type="submit">Login</button>
+</form>
+<p id="loginMessage" class="message">Sign in with your AYANET administrator account.</p>
+</section>
+
+<section class="panel hidden" id="controlPanel">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
+<h2>Platform Overview</h2>
+<button id="logoutButton" class="red">Logout</button>
+</div>
+
+<p id="adminMessage" class="message">Checking administrator access...</p>
+
+<h2>Shop Registrations</h2>
+<p>Review, approve or suspend shops registered on AYANET.</p>
+<button id="refreshButton" class="gold">Refresh Registrations</button>
+<div id="shopList"></div>
+</section>
+</main>
+
+<footer>AYANET MULTI-SHOP MANAGEMENT SYSTEM</footer>
+
+<script>
+(function(){
+"use strict";
+
+const SUPABASE_URL="https://jltadhukraspfdaxbvwo.supabase.co";
+const SUPABASE_KEY="sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu";
+const db=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+const loginPanel=document.getElementById("loginPanel");
+const controlPanel=document.getElementById("controlPanel");
+const loginMessage=document.getElementById("loginMessage");
+const adminMessage=document.getElementById("adminMessage");
+const shopList=document.getElementById("shopList");
+
+function showLogin(message){
+    controlPanel.classList.add("hidden");
+    loginPanel.classList.remove("hidden");
+    if(message) loginMessage.textContent=message;
+}
+
+function showControl(){
+    loginPanel.classList.add("hidden");
+    controlPanel.classList.remove("hidden");
+}
+
+document.getElementById("loginForm").addEventListener("submit",async function(e){
+    e.preventDefault();
+    loginMessage.textContent="Signing in...";
+
+    const email=document.getElementById("email").value.trim();
+    const password=document.getElementById("password").value;
+
+    const {data,error}=await db.auth.signInWithPassword({email,password});
+
+    if(error){
+        loginMessage.textContent="Login failed: "+error.message;
+        return;
+    }
+
+    await verifyAdministrator();
+});
+
+async function verifyAdministrator(){
+    adminMessage.textContent="Verifying Super Admin access...";
+
+    const {data,error}=await db.rpc("get_shop_registrations");
+
+    if(error){
+        await db.auth.signOut();
+        showLogin("Access denied. This account is not authorised as AYANET Super Admin. "+error.message);
+        return;
+    }
+
+    showControl();
+    renderShops(data||[]);
+}
+
+function renderShops(shops){
+    shopList.innerHTML="";
+    adminMessage.textContent="Administrator access verified. Registered shops: "+shops.length;
+
+    if(shops.length===0){
+        shopList.textContent="No shops have been registered yet.";
+        return;
+    }
+
+    shops.forEach(shop=>{
+        const card=document.createElement("div");
+        card.className="shop";
+
+        const name=document.createElement("h3");
+        name.textContent=shop.shop_name;
+
+        const owner=document.createElement("p");
+        owner.textContent="Owner: "+(shop.owner_email||"Not available");
+
+        const slug=document.createElement("p");
+        slug.textContent="Shop ID: "+shop.shop_id;
+
+        const status=document.createElement("p");
+        status.className="status";
+        status.textContent="Status: "+String(shop.shop_status).toUpperCase();
+
+        const date=document.createElement("p");
+        date.textContent="Registered: "+new Date(shop.registration_date).toLocaleString();
+
+        card.append(name,owner,slug,status,date);
+
+        if(shop.shop_status!=="active"){
+            const approve=document.createElement("button");
+            approve.className="gold";
+            approve.textContent="Approve Shop";
+            approve.addEventListener("click",()=>reviewShop(shop.shop_id,"active"));
+            card.appendChild(approve);
+        }
+
+        if(shop.shop_status!=="suspended"){
+            const suspend=document.createElement("button");
+            suspend.className="red";
+            suspend.textContent="Suspend Shop";
+            suspend.addEventListener("click",()=>reviewShop(shop.shop_id,"suspended"));
+            card.appendChild(suspend);
+        }
+
+        shopList.appendChild(card);
+    });
+}
+
+async function reviewShop(shopId,decision){
+    const action=decision==="active"?"approve":"suspend";
+
+    if(!confirm("Are you sure you want to "+action+" this shop?")) return;
+
+    adminMessage.textContent="Updating shop...";
+    const {error}=await db.rpc("review_shop_registration",{
+        p_shop_id:shopId,
+        p_decision:decision
+    });
+
+    if(error){
+        adminMessage.textContent="Update failed: "+error.message;
+        return;
+    }
+
+    adminMessage.textContent="Shop successfully updated.";
+    await verifyAdministrator();
+}
+
+document.getElementById("refreshButton").addEventListener("click",verifyAdministrator);
+
+document.getElementById("logoutButton").addEventListener("click",async function(){
+    await db.auth.signOut();
+    showLogin("You have signed out.");
+});
+
+db.auth.onAuthStateChange((event,session)=>{
+    if(event==="SIGNED_OUT"){
+        showLogin("You have signed out.");
+    }
+});
+
+(async function(){
+    const {data}=await db.auth.getSession();
+    if(data.session){
+        await verifyAdministrator();
+    }
+})();
+
+})();
+</script>
+</body>
+</html>
