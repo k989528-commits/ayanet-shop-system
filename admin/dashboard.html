@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AYANET Admin Dashboard</title>
+    <title>AYANET Multi-Shop Management</title>
 
     <link rel="stylesheet" href="admin.css">
 
@@ -32,15 +32,19 @@
 
         <header>
             <h1>Welcome to AYANET</h1>
-            <p>Shop Management System</p>
+            <p>Multi-Shop Management System</p>
             <button id="logoutButton" type="button">Logout</button>
         </header>
 
         <main>
 
             <section id="dashboardSection">
-                <h2>Dashboard</h2>
-                <p>Manage your shop records here.</p>
+                <h2>Shop Dashboard</h2>
+                <p>Manage the records belonging to the selected shop.</p>
+
+                <div id="shopSelectorArea">
+                    <p>Loading your shops...</p>
+                </div>
             </section>
 
             <section id="serviceManagementSection">
@@ -86,7 +90,7 @@
 
             <section id="productsSection">
                 <h2>Products</h2>
-                <p>Manage your shop products.</p>
+                <p>Manage products for the selected shop.</p>
 
                 <form id="productForm">
                     <label for="productName">Product Name</label>
@@ -228,9 +232,9 @@
         </main>
     </div>
 
-    <script src="admin.js?v=20261117-1"></script>
-    <script src="product-photos.js?v=20261107-2"></script>
-    <script src="sales-cart.js?v=20261117-1"></script>
+    <script src="admin.js?v=20261122-2"></script>
+    <script src="product-photos.js?v=20261122-2"></script>
+    <script src="sales-cart.js?v=20261122-2"></script>
 
 </body>
 </html>
