@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYANET | Payment Settings</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,sans-serif;background:#f3f6fb;color:#263449}
+header{background:#102b50;color:#fff;padding:20px 6%;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{margin:0;color:#f4c542;font-size:24px}
+a{color:#fff}
+main{max-width:900px;margin:30px auto;padding:0 16px}
+.panel{background:#fff;border-radius:12px;padding:22px;margin-bottom:18px;box-shadow:0 4px 15px rgba(0,0,0,.06)}
+h2,h3{color:#102b50}
+h2{margin-top:0}
+label{display:block;font-weight:bold;margin:12px 0 6px;color:#102b50}
+input,select,textarea{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:7px;font:inherit}
+button{border:0;border-radius:7px;padding:12px 16px;background:#102b50;color:#fff;font-weight:bold;cursor:pointer}
+button:hover{background:#1d4779}
+button:disabled{opacity:.6;cursor:not-allowed}
+.primary{width:100%;margin-top:16px}
+.secondary{background:#64748b}
+.notice{padding:12px;border-radius:8px;background:#eef4fb;color:#334155;line-height:1.5;margin:12px 0}
+.status{margin-top:14px;font-weight:bold;line-height:1.5}
+.method{border:1px solid #dbe3ef;border-radius:10px;padding:16px;margin:14px 0}
+.method-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.method-head h3{margin:0}
+.toggle{display:flex;align-items:center;gap:8px;font-weight:bold;color:#102b50}
+.toggle input{width:20px;height:20px}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0 14px;margin-top:10px}
+.hidden{display:none!important}
+.small{font-size:13px;color:#64748b;line-height:1.5}
+#settingsArea{display:none}
+</style>
+</head>
+<body>
+<header>
+<h1>AYANET PAYMENT SETTINGS</h1>
+<a href="./dashboard.html">Back to Dashboard</a>
+</header>
+
+<main>
+<section class="panel" id="loginPanel">
+<h2>Shop Owner Login</h2>
+<p class="small">Sign in using the same email and password you use for the AYANET shop dashboard.</p>
+<form id="loginForm">
+<label for="email">Email Address</label>
+<input id="email" type="email" autocomplete="username" required>
+<label for="password">Password</label>
+<input id="password" type="password" autocomplete="current-password" required>
+<button class="primary" type="submit" id="loginButton">SIGN IN</button>
+</form>
+<div class="status" id="loginMessage" role="status"></div>
+</section>
+
+<section class="panel hidden" id="shopPanel">
+<h2>Select Your Shop</h2>
+<label for="shopSelect">Shop</label>
+<select id="shopSelect"></select>
+<div class="notice" id="shopNotice">Only shops where your account has owner or admin access can be changed here.</div>
+</section>
+
+<section class="panel" id="settingsArea">
+<h2>Choose Your Payment Methods</h2>
+<p class="small">Switch on the methods your shop accepts. Enter the correct details customers should use. Customers will only be shown enabled methods.</p>
+<div class="notice">Do not enter your M-Pesa PIN, bank password or any secret security code here. Only enter payment instructions customers need.</div>
+
+<label for="preferred">Preferred Payment Method</label>
+<select id="preferred">
+<option value="mpesa_pochi">M-Pesa Pochi la Biashara</option>
+<option value="mpesa_till">M-Pesa Till Number</option>
+<option value="mpesa_paybill">M-Pesa Paybill</option>
+<option value="mpesa_send_money">M-Pesa Send Money</option>
+<option value="airtel_money">Airtel Money</option>
+<option value="bank_transfer">Bank Transfer</option>
+<option value="cash_on_collection">Cash on Collection</option>
+<option value="cash_on_delivery">Cash on Delivery</option>
+<option value="other">Other Payment Method</option>
+</select>
+
+<div class="method">
+<div class="method-head"><h3>M-Pesa Pochi la Biashara</h3><label class="toggle"><input type="checkbox" id="pochiEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="pochiBusiness">Business Name</label><input id="pochiBusiness" placeholder="Business name"></div>
+<div><label for="pochiNumber">Pochi Phone Number</label><input id="pochiNumber" placeholder="e.g. 07XXXXXXXX"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>M-Pesa Till Number</h3><label class="toggle"><input type="checkbox" id="tillEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="tillBusiness">Business Name</label><input id="tillBusiness" placeholder="Business name"></div>
+<div><label for="tillNumber">Till Number</label><input id="tillNumber" placeholder="Till number"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>M-Pesa Paybill</h3><label class="toggle"><input type="checkbox" id="paybillEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="paybillBusiness">Business Name</label><input id="paybillBusiness" placeholder="Business name"></div>
+<div><label for="paybillNumber">Paybill Number</label><input id="paybillNumber" placeholder="Paybill number"></div>
+<div><label for="paybillAccount">Account Number</label><input id="paybillAccount" placeholder="Account number or account name"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>M-Pesa Send Money</h3><label class="toggle"><input type="checkbox" id="sendEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="sendName">Recipient Name</label><input id="sendName" placeholder="Recipient name"></div>
+<div><label for="sendNumber">Phone Number</label><input id="sendNumber" placeholder="07XXXXXXXX"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>Airtel Money</h3><label class="toggle"><input type="checkbox" id="airtelEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="airtelBusiness">Business / Recipient Name</label><input id="airtelBusiness" placeholder="Name"></div>
+<div><label for="airtelNumber">Airtel Money Number</label><input id="airtelNumber" placeholder="Phone number"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>Bank Transfer</h3><label class="toggle"><input type="checkbox" id="bankEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="bankName">Bank Name</label><input id="bankName" placeholder="Bank name"></div>
+<div><label for="bankAccountName">Account Name</label><input id="bankAccountName" placeholder="Account holder"></div>
+<div><label for="bankAccountNumber">Account Number</label><input id="bankAccountNumber" placeholder="Account number"></div>
+<div><label for="bankBranch">Branch</label><input id="bankBranch" placeholder="Branch (optional)"></div>
+</div></div>
+
+<div class="method">
+<div class="method-head"><h3>Cash on Collection</h3><label class="toggle"><input type="checkbox" id="collectionEnabled"> Enabled</label></div>
+<p class="small">Customer pays when collecting the order from your shop.</p>
+</div>
+
+<div class="method">
+<div class="method-head"><h3>Cash on Delivery</h3><label class="toggle"><input type="checkbox" id="deliveryEnabled"> Enabled</label></div>
+<p class="small">Customer pays when the order is delivered.</p>
+</div>
+
+<div class="method">
+<div class="method-head"><h3>Other Payment Method</h3><label class="toggle"><input type="checkbox" id="otherEnabled"> Enabled</label></div>
+<div class="fields">
+<div><label for="otherName">Payment Method Name</label><input id="otherName" placeholder="Name of payment method"></div>
+<div><label for="otherInstructions">Customer Instructions</label><textarea id="otherInstructions" rows="3" placeholder="Explain how customers should pay"></textarea></div>
+</div></div>
+
+<button class="primary" type="button" id="saveButton">SAVE PAYMENT SETTINGS</button>
+<div class="status" id="saveMessage" role="status"></div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const db = window.supabase.createClient(
+    "https://jltadhukraspfdaxbvwo.supabase.co",
+    "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
+  );
+
+  const $ = id => document.getElementById(id);
+  let shops = [];
+  let currentShop = null;
+
+  const defaultSettings = {
+    preferred_method: "mpesa_pochi",
+    methods: {
+      mpesa_pochi: {enabled:false,business_name:"",number:""},
+      mpesa_till: {enabled:false,business_name:"",till_number:""},
+      mpesa_paybill: {enabled:false,business_name:"",paybill_number:"",account_number:""},
+      mpesa_send_money: {enabled:false,phone_number:"",recipient_name:""},
+      airtel_money: {enabled:false,phone_number:"",business_name:""},
+      bank_transfer: {enabled:false,bank_name:"",account_name:"",account_number:"",branch:""},
+      cash_on_collection: {enabled:false},
+      cash_on_delivery: {enabled:false},
+      other: {enabled:false,method_name:"",instructions:""}
+    }
+  };
+
+  function showStatus(id, text, good) {
+    $(id).textContent = text;
+    $(id).style.color = good ? "#137547" : "#b42318";
+  }
+
+  function setVal(id, value) { $(id).value = value || ""; }
+  function setCheck(id, value) { $(id).checked = Boolean(value); }
+
+  function fillSettings(settings) {
+    const s = settings && typeof settings === "object" ? settings : defaultSettings;
+    const m = s.methods || {};
+    $("preferred").value = s.preferred_method || "mpesa_pochi";
+
+    setCheck("pochiEnabled",m.mpesa_pochi?.enabled);
+    setVal("pochiBusiness",m.mpesa_pochi?.business_name);
+    setVal("pochiNumber",m.mpesa_pochi?.number);
+
+    setCheck("tillEnabled",m.mpesa_till?.enabled);
+    setVal("tillBusiness",m.mpesa_till?.business_name);
+    setVal("tillNumber",m.mpesa_till?.till_number);
+
+    setCheck("paybillEnabled",m.mpesa_paybill?.enabled);
+    setVal("paybillBusiness",m.mpesa_paybill?.business_name);
+    setVal("paybillNumber",m.mpesa_paybill?.paybill_number);
+    setVal("paybillAccount",m.mpesa_paybill?.account_number);
+
+    setCheck("sendEnabled",m.mpesa_send_money?.enabled);
+    setVal("sendName",m.mpesa_send_money?.recipient_name);
+    setVal("sendNumber",m.mpesa_send_money?.phone_number);
+
+    setCheck("airtelEnabled",m.airtel_money?.enabled);
+    setVal("airtelBusiness",m.airtel_money?.business_name);
+    setVal("airtelNumber",m.airtel_money?.phone_number);
+
+    setCheck("bankEnabled",m.bank_transfer?.enabled);
+    setVal("bankName",m.bank_transfer?.bank_name);
+    setVal("bankAccountName",m.bank_transfer?.account_name);
+    setVal("bankAccountNumber",m.bank_transfer?.account_number);
+    setVal("bankBranch",m.bank_transfer?.branch);
+
+    setCheck("collectionEnabled",m.cash_on_collection?.enabled);
+    setCheck("deliveryEnabled",m.cash_on_delivery?.enabled);
+
+    setCheck("otherEnabled",m.other?.enabled);
+    setVal("otherName",m.other?.method_name);
+    setVal("otherInstructions",m.other?.instructions);
+  }
+
+  function readSettings() {
+    return {
+      preferred_method: $("preferred").value,
+      methods: {
+        mpesa_pochi:{enabled:$("pochiEnabled").checked,business_name:$("pochiBusiness").value.trim(),number:$("pochiNumber").value.trim()},
+        mpesa_till:{enabled:$("tillEnabled").checked,business_name:$("tillBusiness").value.trim(),till_number:$("tillNumber").value.trim()},
+        mpesa_paybill:{enabled:$("paybillEnabled").checked,business_name:$("paybillBusiness").value.trim(),paybill_number:$("paybillNumber").value.trim(),account_number:$("paybillAccount").value.trim()},
+        mpesa_send_money:{enabled:$("sendEnabled").checked,phone_number:$("sendNumber").value.trim(),recipient_name:$("sendName").value.trim()},
+        airtel_money:{enabled:$("airtelEnabled").checked,phone_number:$("airtelNumber").value.trim(),business_name:$("airtelBusiness").value.trim()},
+        bank_transfer:{enabled:$("bankEnabled").checked,bank_name:$("bankName").value.trim(),account_name:$("bankAccountName").value.trim(),account_number:$("bankAccountNumber").value.trim(),branch:$("bankBranch").value.trim()},
+        cash_on_collection:{enabled:$("collectionEnabled").checked},
+        cash_on_delivery:{enabled:$("deliveryEnabled").checked},
+        other:{enabled:$("otherEnabled").checked,method_name:$("otherName").value.trim(),instructions:$("otherInstructions").value.trim()}
+      }
+    };
+  }
+
+  function validateSettings(settings) {
+    const m = settings.methods;
+    if (!Object.values(m).some(method => method.enabled)) return "Enable at least one payment method.";
+    if (m.mpesa_pochi.enabled && (!m.mpesa_pochi.business_name || !m.mpesa_pochi.number)) return "Complete the Pochi business name and number.";
+    if (m.mpesa_till.enabled && (!m.mpesa_till.business_name || !m.mpesa_till.till_number)) return "Complete the Till business name and number.";
+    if (m.mpesa_paybill.enabled && (!m.mpesa_paybill.business_name || !m.mpesa_paybill.paybill_number || !m.mpesa_paybill.account_number)) return "Complete the Paybill name, number and account number.";
+    if (m.mpesa_send_money.enabled && (!m.mpesa_send_money.recipient_name || !m.mpesa_send_money.phone_number)) return "Complete the Send Money recipient name and phone number.";
+    if (m.airtel_money.enabled && (!m.airtel_money.business_name || !m.airtel_money.phone_number)) return "Complete the Airtel Money name and number.";
+    if (m.bank_transfer.enabled && (!m.bank_transfer.bank_name || !m.bank_transfer.account_name || !m.bank_transfer.account_number)) return "Complete the bank name, account name and account number.";
+    if (m.other.enabled && (!m.other.method_name || !m.other.instructions)) return "Complete the other payment method and instructions.";
+    if (!m[settings.preferred_method]?.enabled) return "Your preferred payment method must be enabled.";
+    return "";
+  }
+
+  async function loadShops(user) {
+    const {data, error} = await db
+      .from("shop_members")
+      .select("shop_id, role, shops(id,name,slug,status,payment_settings)")
+      .eq("user_id", user.id)
+      .in("role", ["owner","admin"]);
+
+    if (error) throw error;
+    shops = (data || [])
+      .map(row => row.shops)
+      .filter(shop => shop && shop.status === "active");
+
+    if (!shops.length) {
+      throw new Error("No active shop was found for this account. Sign in with the shop owner's account.");
+    }
+
+    $("shopSelect").innerHTML = "";
+    shops.forEach(shop => {
+      const option = document.createElement("option");
+      option.value = shop.id;
+      option.textContent = shop.name + " (" + shop.status.toUpperCase() + ")";
+      $("shopSelect").appendChild(option);
+    });
+
+    $("shopPanel").classList.remove("hidden");
+    $("settingsArea").style.display = "block";
+    selectShop(shops[0].id);
+  }
+
+  function selectShop(shopId) {
+    currentShop = shops.find(shop => shop.id === shopId);
+    if (!currentShop) return;
+    fillSettings(currentShop.payment_settings || defaultSettings);
+    showStatus("saveMessage", "", true);
+  }
+
+  $("shopSelect").addEventListener("change", function () {
+    selectShop(this.value);
+  });
+
+  async function signedIn(user) {
+    $("loginPanel").classList.add("hidden");
+    try {
+      await loadShops(user);
+    } catch (error) {
+      $("loginPanel").classList.remove("hidden");
+      showStatus("loginMessage", error.message || "Could not load your shops.", false);
+    }
+  }
+
+  $("loginForm").addEventListener("submit", async function (event) {
+    event.preventDefault();
+    $("loginButton").disabled = true;
+    showStatus("loginMessage", "Signing in...", true);
+    const {data,error} = await db.auth.signInWithPassword({
+      email:$("email").value.trim(),
+      password:$("password").value
+    });
+    $("loginButton").disabled = false;
+    if (error) {
+      showStatus("loginMessage", error.message, false);
+      return;
+    }
+    await signedIn(data.user);
+  });
+
+  $("saveButton").addEventListener("click", async function () {
+    if (!currentShop) return;
+    const settings = readSettings();
+    const validation = validateSettings(settings);
+    if (validation) {
+      showStatus("saveMessage", validation, false);
+      return;
+    }
+
+    $("saveButton").disabled = true;
+    $("saveButton").textContent = "SAVING...";
+    const {error} = await db.rpc("update_my_shop_payment_settings", {
+      p_shop_id: currentShop.id,
+      p_payment_settings: settings
+    });
+    $("saveButton").disabled = false;
+    $("saveButton").textContent = "SAVE PAYMENT SETTINGS";
+
+    if (error) {
+      showStatus("saveMessage", "Could not save: " + error.message, false);
+      return;
+    }
+
+    currentShop.payment_settings = settings;
+    showStatus("saveMessage", "Payment settings saved successfully.", true);
+  });
+
+  db.auth.getSession().then(({data}) => {
+    if (data.session?.user) signedIn(data.session.user);
+  });
+});
+</script>
+</body>
+</html>
