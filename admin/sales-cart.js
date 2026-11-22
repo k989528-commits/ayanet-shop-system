@@ -1,7 +1,8 @@
 
 /* =====================================
-   AYANET MULTI-PRODUCT SALES CART
+   AYANET MULTI-SHOP SALES CART
    MULTIPLE PRODUCTS
+   SHOP-SPECIFIC PRODUCT LOADING
    STOCK VALIDATION
    ONE RECEIPT PER TRANSACTION
    DOWNLOADABLE PDF RECEIPT
@@ -21,6 +22,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let cart = [];
     let lastReceipt = null;
     let savingSale = false;
+    let loadingShopId = null;
+
+    function currentShopId() {
+        return window.AYANET_CURRENT_SHOP_ID || null;
+    }
 
     function money(value) {
         return Number(value || 0).toFixed(2);
@@ -85,7 +91,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const details = document.createElement("p");
             details.textContent =
-                item.quantity + " × KSh " + money(item.price) +
+                item.quantity + " Ã— KSh " + money(item.price) +
                 " = KSh " + money(item.quantity * item.price);
 
             const quantityButton = document.createElement("button");
@@ -104,6 +110,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 if (!Number.isInteger(quantity) || quantity <= 0) {
                     alert("Enter a valid whole number greater than zero.");
+                    return;
+                }
+
+                const product = products.find(
+                    p => String(p.id) === String(item.product_id)
+                );
+
+                if (!product) {
+                    showMessage("This product is no longer available in this shop.");
+                    return;
+                }
+
+                const otherQuantity = cart.reduce((sum, other, i) => {
+                    return i !== index && String(other.product_id) === String(item.product_id)
+                        ? sum + other.quantity
+                        : sum;
+                }, 0);
+
+                if (quantity + otherQuantity > Number(product.stock)) {
+                    alert("Not enough stock. Available stock: " + product.stock);
                     return;
                 }
 
@@ -132,19 +158,37 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (!select) return;
 
+        const shopId = currentShopId();
+
+        products = [];
         select.innerHTML = "";
+
         const first = document.createElement("option");
         first.value = "";
+
+        if (!shopId) {
+            first.textContent = "Select a shop first";
+            select.appendChild(first);
+            showMessage("Select a shop before recording sales.");
+            return;
+        }
+
         first.textContent = "Loading products...";
         select.appendChild(first);
+
+        loadingShopId = shopId;
 
         try {
             const { data, error } = await db
                 .from("products")
-                .select("id, name, price, stock")
+                .select("id, name, price, stock, shop_id")
+                .eq("shop_id", shopId)
                 .order("name");
 
             if (error) throw error;
+
+            // Ignore an old request if the user changed shops.
+            if (currentShopId() !== shopId) return;
 
             products = data || [];
 
@@ -159,30 +203,46 @@ document.addEventListener("DOMContentLoaded", function () {
                 const productOption = document.createElement("option");
                 productOption.value = product.id;
                 productOption.textContent =
-                    product.name + " — Stock: " + product.stock +
-                    " — KSh " + money(product.price);
+                    product.name + " â€” Stock: " + product.stock +
+                    " â€” KSh " + money(product.price);
 
                 select.appendChild(productOption);
             });
 
             if (products.length === 0) {
-                showMessage("No products found. Add products first.");
+                showMessage("No products found in this shop. Add products first.");
             } else {
-                showMessage("Products loaded. You can start adding items.");
+                showMessage("Shop products loaded. You can start adding items.");
             }
 
         } catch (error) {
+            if (currentShopId() !== shopId) return;
+
             select.innerHTML =
                 '<option value="">Could not load products</option>';
 
             showMessage("Product loading failed: " + error.message);
+
+        } finally {
+            if (loadingShopId === shopId) {
+                loadingShopId = null;
+            }
         }
     }
 
     function addCartItem() {
-        const productId = get("cartProduct").value;
-        const quantityInput = get("cartQuantity").value;
-        const quantity = Number(quantityInput);
+        if (!currentShopId()) {
+            showMessage("Select a shop before adding products.");
+            return;
+        }
+
+        const productSelect = get("cartProduct");
+        const quantityElement = get("cartQuantity");
+
+        if (!productSelect || !quantityElement) return;
+
+        const productId = productSelect.value;
+        const quantity = Number(quantityElement.value);
 
         if (!productId) {
             showMessage("Please choose a product.");
@@ -229,8 +289,8 @@ document.addEventListener("DOMContentLoaded", function () {
             });
         }
 
-        get("cartQuantity").value = "1";
-        get("cartProduct").value = "";
+        quantityElement.value = "1";
+        productSelect.value = "";
 
         showMessage(product.name + " added to cart.");
         renderCart();
@@ -244,7 +304,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             if (!window.jspdf || !window.jspdf.jsPDF) {
-                throw new Error("PDF service is unavailable. Check your internet connection.");
+                throw new Error(
+                    "PDF service is unavailable. Check your internet connection."
+                );
             }
 
             const { jsPDF } = window.jspdf;
@@ -274,6 +336,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
             doc.text("Receipt No: " + receipt.number, 15, y);
             y += 7;
+
+            if (receipt.shopName) {
+                doc.text("Shop: " + receipt.shopName, 15, y);
+                y += 7;
+            }
 
             doc.text("Date: " + receipt.date, 15, y);
             y += 7;
@@ -372,12 +439,32 @@ document.addEventListener("DOMContentLoaded", function () {
     async function completeCartSale() {
         if (savingSale) return;
 
+        const shopId = currentShopId();
+
+        if (!shopId) {
+            showMessage("Select a shop before recording sales.");
+            return;
+        }
+
         if (cart.length === 0) {
             showMessage("Your cart is empty. Add products first.");
             return;
         }
 
-        const customer = get("cartCustomerName").value.trim();
+        // Make sure every cart item belongs to the selected shop.
+        const invalidItem = cart.some(item =>
+            !products.some(product =>
+                String(product.id) === String(item.product_id)
+            )
+        );
+
+        if (invalidItem) {
+            showMessage("The cart contains an item from another shop. Clear the cart and try again.");
+            return;
+        }
+
+        const customerElement = get("cartCustomerName");
+        const customer = customerElement ? customerElement.value.trim() : "";
 
         const total = calculateTotal();
 
@@ -391,8 +478,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const button = get("completeCartSaleButton");
 
         savingSale = true;
-        button.disabled = true;
-        button.textContent = "Saving Sale...";
+
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Saving Sale...";
+        }
+
         showMessage("Recording your sale. Please wait...");
 
         const receiptNumber = makeReceiptNumber();
@@ -432,6 +523,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 number: receiptNumber,
                 date: kenyaDateTime(),
                 customer,
+                shopName: window.AYANET_CURRENT_SHOP_NAME || "",
                 items: savedItems,
                 total: savedTotal
             };
@@ -439,7 +531,9 @@ document.addEventListener("DOMContentLoaded", function () {
             cart = [];
             renderCart();
 
-            get("cartCustomerName").value = "";
+            if (customerElement) {
+                customerElement.value = "";
+            }
 
             showMessage(
                 "Sale saved successfully! Receipt: " + receiptNumber
@@ -465,21 +559,29 @@ document.addEventListener("DOMContentLoaded", function () {
 
         } finally {
             savingSale = false;
-            button.disabled = false;
-            button.textContent = "Complete Sale & Download Receipt";
+
+            if (button) {
+                button.disabled = false;
+                button.textContent = "Complete Sale & Download Receipt";
+            }
         }
     }
 
+    // Add products to cart.
     const addButton = get("addCartItemButton");
+
     if (addButton) {
         addButton.addEventListener("click", addCartItem);
     }
 
+    // Complete the sale.
     const completeButton = get("completeCartSaleButton");
+
     if (completeButton) {
         completeButton.addEventListener("click", completeCartSale);
     }
 
+    // Product refresh button.
     const refreshButton = document.createElement("button");
     refreshButton.type = "button";
     refreshButton.textContent = "Load / Refresh Products";
@@ -495,8 +597,22 @@ document.addEventListener("DOMContentLoaded", function () {
         refreshButton.addEventListener("click", loadCartProducts);
     }
 
+    // When the selected shop changes, clear the old shop's cart.
+    document.addEventListener("ayanet-shop-changed", function () {
+        cart = [];
+        products = [];
+        lastReceipt = null;
+
+        renderCart();
+        loadCartProducts();
+
+        showMessage("Shop changed. Products are being refreshed.");
+    });
+
+    // Initial cart display.
     renderCart();
 
+    // Respond to authentication changes.
     db.auth.onAuthStateChange(function (event, session) {
         if (session && (
             event === "SIGNED_IN" ||
