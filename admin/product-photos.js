@@ -1,4 +1,13 @@
+
+/* =====================================
+   AYANET MULTI-SHOP PRODUCT PHOTOS
+   PHOTO UPLOAD AND PREVIEW
+   REPLACE AND DELETE PHOTOS
+   SHOP-SPECIFIC PRODUCT MANAGEMENT
+===================================== */
+
 document.addEventListener("DOMContentLoaded", function () {
+
     const db = window.supabase.createClient(
         "https://jltadhukraspfdaxbvwo.supabase.co",
         "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
@@ -10,6 +19,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const productsSection = document.getElementById("productsSection");
 
     if (!form || !message || !productsSection) return;
+
+    function currentShopId() {
+        return window.AYANET_CURRENT_SHOP_ID || null;
+    }
 
     // PRODUCT PHOTO INPUT
     const label = document.createElement("label");
@@ -38,6 +51,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     photoInput.addEventListener("change", function () {
         const file = photoInput.files[0];
+
         if (!file) return;
 
         if (!validPhoto(file)) {
@@ -64,7 +78,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (position === -1) return null;
 
-        return decodeURIComponent(url.substring(position + marker.length));
+        return decodeURIComponent(
+            url.substring(position + marker.length)
+        );
     }
 
     async function uploadPhoto(file, productId) {
@@ -86,10 +102,29 @@ document.addEventListener("DOMContentLoaded", function () {
         };
     }
 
+    async function removeUploadedPhoto(filename) {
+        if (!filename) return;
+
+        const { error } = await db.storage
+            .from(bucket)
+            .remove([filename]);
+
+        if (error) {
+            console.warn("Photo cleanup failed:", error.message);
+        }
+    }
+
     // ADD PRODUCT WITH OPTIONAL PHOTO
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
         event.stopImmediatePropagation();
+
+        const shopId = currentShopId();
+
+        if (!shopId) {
+            message.textContent = "Please select a shop before adding a product.";
+            return;
+        }
 
         const file = photoInput.files[0];
 
@@ -100,10 +135,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
         button.disabled = true;
 
-        try {
-            let imageUrl = null;
+        let uploadedFilename = null;
 
+        try {
             const product = {
+                shop_id: shopId,
                 name: document.getElementById("productName").value.trim(),
                 description: document.getElementById("productDescription").value.trim(),
                 cost_price: Number(document.getElementById("productCostPrice").value),
@@ -112,33 +148,58 @@ document.addEventListener("DOMContentLoaded", function () {
                 image_url: null
             };
 
-            if (file) {
-                message.textContent = "Uploading photo...";
-                const uploaded = await uploadPhoto(file, "new");
-                imageUrl = uploaded.url;
+            if (
+                !product.name ||
+                !Number.isFinite(product.price) ||
+                !Number.isFinite(product.cost_price) ||
+                !Number.isFinite(product.stock)
+            ) {
+                throw new Error("Please enter valid product details.");
             }
 
-            product.image_url = imageUrl;
+            if (file) {
+                message.textContent = "Uploading photo...";
+
+                const uploaded = await uploadPhoto(file, "new");
+
+                uploadedFilename = uploaded.filename;
+                product.image_url = uploaded.url;
+            }
+
+            if (currentShopId() !== shopId) {
+                throw new Error("The selected shop changed. Please try again.");
+            }
 
             message.textContent = "Saving product...";
 
-            const { error } = await db.from("products").insert([product]);
+            const { error } = await db
+                .from("products")
+                .insert([product]);
 
             if (error) throw error;
+
+            uploadedFilename = null;
 
             alert("Product saved successfully!");
             window.location.reload();
 
         } catch (error) {
+            if (uploadedFilename) {
+                await removeUploadedPhoto(uploadedFilename);
+            }
+
             message.textContent = "Error: " + error.message;
+
         } finally {
             button.disabled = false;
         }
+
     }, true);
 
     // PRODUCT PHOTO MANAGEMENT AREA
     const manager = document.createElement("section");
     manager.style.marginTop = "25px";
+
     manager.innerHTML = `
         <h3>Product Photo Management</h3>
         <p>View, replace or delete product photos without deleting products.</p>
@@ -152,21 +213,32 @@ document.addEventListener("DOMContentLoaded", function () {
     const photoList = manager.querySelector("#productPhotoList");
 
     async function loadProductPhotos() {
+        const shopId = currentShopId();
+
+        if (!shopId) {
+            photoList.textContent = "Select a shop first to manage its product photos.";
+            return;
+        }
+
         loadButton.disabled = true;
         photoList.textContent = "Loading products...";
 
         try {
             const { data, error } = await db
                 .from("products")
-                .select("id,name,image_url")
+                .select("id,name,image_url,shop_id")
+                .eq("shop_id", shopId)
                 .order("name");
 
             if (error) throw error;
 
+            // Ignore results from a shop that is no longer selected.
+            if (currentShopId() !== shopId) return;
+
             photoList.innerHTML = "";
 
             if (!data || data.length === 0) {
-                photoList.textContent = "No products found.";
+                photoList.textContent = "No products found in this shop.";
                 return;
             }
 
@@ -188,6 +260,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     image.style.display = "block";
                     image.style.marginBottom = "10px";
                     card.appendChild(image);
+
                 } else {
                     const noPhoto = document.createElement("p");
                     noPhoto.textContent = "No photo uploaded.";
@@ -216,32 +289,66 @@ document.addEventListener("DOMContentLoaded", function () {
                         return;
                     }
 
+                    if (currentShopId() !== shopId) {
+                        alert("The selected shop has changed. Refresh the photo list.");
+                        return;
+                    }
+
                     replaceButton.disabled = true;
+
+                    let uploadedFilename = null;
 
                     try {
                         const uploaded = await uploadPhoto(file, product.id);
+                        uploadedFilename = uploaded.filename;
 
-                        const { error } = await db
+                        if (currentShopId() !== shopId) {
+                            throw new Error("The selected shop changed. Please try again.");
+                        }
+
+                        const { data: updatedProduct, error } = await db
                             .from("products")
                             .update({ image_url: uploaded.url })
-                            .eq("id", product.id);
+                            .eq("id", product.id)
+                            .eq("shop_id", shopId)
+                            .select("id");
 
-                        if (error) {
-                            await db.storage.from(bucket).remove([uploaded.filename]);
-                            throw error;
+                        if (error) throw error;
+
+                        if (!updatedProduct || updatedProduct.length === 0) {
+                            throw new Error("Product was not updated. Check shop access.");
                         }
+
+                        uploadedFilename = null;
 
                         const oldPath = storagePath(product.image_url);
 
                         if (oldPath) {
-                            await db.storage.from(bucket).remove([oldPath]);
+                            const { error: cleanupError } = await db.storage
+                                .from(bucket)
+                                .remove([oldPath]);
+
+                            if (cleanupError) {
+                                alert(
+                                    "New photo saved, but old photo cleanup failed: " +
+                                    cleanupError.message
+                                );
+                            }
                         }
 
                         alert("Product photo replaced successfully!");
-                        await loadProductPhotos();
+
+                        if (currentShopId() === shopId) {
+                            await loadProductPhotos();
+                        }
 
                     } catch (error) {
+                        if (uploadedFilename) {
+                            await removeUploadedPhoto(uploadedFilename);
+                        }
+
                         alert("Could not replace photo: " + error.message);
+
                     } finally {
                         replaceButton.disabled = false;
                     }
@@ -256,36 +363,59 @@ document.addEventListener("DOMContentLoaded", function () {
                     deleteButton.style.marginLeft = "8px";
 
                     deleteButton.addEventListener("click", async function () {
-                        if (!confirm("Delete the photo for " + product.name + "? The product will remain.")) {
+                        if (!confirm(
+                            "Delete the photo for " + product.name +
+                            "? The product will remain."
+                        )) {
+                            return;
+                        }
+
+                        if (currentShopId() !== shopId) {
+                            alert("The selected shop has changed. Refresh the photo list.");
                             return;
                         }
 
                         deleteButton.disabled = true;
 
                         try {
-                            const { error } = await db
+                            const { data: updatedProduct, error } = await db
                                 .from("products")
                                 .update({ image_url: null })
-                                .eq("id", product.id);
+                                .eq("id", product.id)
+                                .eq("shop_id", shopId)
+                                .select("id");
 
                             if (error) throw error;
+
+                            if (!updatedProduct || updatedProduct.length === 0) {
+                                throw new Error("Product was not updated. Check shop access.");
+                            }
 
                             const oldPath = storagePath(product.image_url);
 
                             if (oldPath) {
                                 const { error: storageError } = await db
-                                    .storage.from(bucket).remove([oldPath]);
+                                    .storage
+                                    .from(bucket)
+                                    .remove([oldPath]);
 
                                 if (storageError) {
-                                    alert("Photo removed from product, but storage cleanup failed: " + storageError.message);
+                                    alert(
+                                        "Photo removed from product, but storage cleanup failed: " +
+                                        storageError.message
+                                    );
                                 }
                             }
 
                             alert("Photo deleted. The product is still saved.");
-                            await loadProductPhotos();
+
+                            if (currentShopId() === shopId) {
+                                await loadProductPhotos();
+                            }
 
                         } catch (error) {
                             alert("Could not delete photo: " + error.message);
+
                         } finally {
                             deleteButton.disabled = false;
                         }
@@ -298,11 +428,27 @@ document.addEventListener("DOMContentLoaded", function () {
             });
 
         } catch (error) {
-            photoList.textContent = "Error loading photos: " + error.message;
+            if (currentShopId() === shopId) {
+                photoList.textContent =
+                    "Error loading photos: " + error.message;
+            }
+
         } finally {
             loadButton.disabled = false;
         }
     }
 
     loadButton.addEventListener("click", loadProductPhotos);
+
+    // Refresh photo management when the selected shop changes.
+    document.addEventListener("ayanet-shop-changed", function () {
+        photoList.textContent =
+            currentShopId()
+                ? "Shop changed. Load Product Photos to view this shop's photos."
+                : "Select a shop first.";
+
+        photoInput.value = "";
+        preview.style.display = "none";
+    });
+
 });
