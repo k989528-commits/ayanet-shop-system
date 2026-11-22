@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYANET | Register a Shop</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f1f4f9;font-family:Arial,sans-serif;color:#17233b}
+.container{max-width:480px;margin:45px auto;padding:20px}
+.panel{background:white;padding:28px;border-radius:14px;box-shadow:0 5px 25px #00000012}
+h1{text-align:center;color:#10264b;margin-bottom:5px}
+.subtitle{text-align:center;color:#68758a;margin-bottom:25px}
+label{display:block;font-weight:bold;margin:15px 0 7px}
+input{width:100%;padding:13px;border:1px solid #ccd3df;border-radius:7px;font-size:16px}
+button{width:100%;padding:14px;margin-top:15px;border:0;border-radius:7px;background:#10264b;color:white;font-size:16px;font-weight:bold;cursor:pointer}
+button.secondary{background:#b58a32;color:#14213b}
+button:disabled{opacity:.6;cursor:not-allowed}
+#message{margin-top:18px;padding:13px;border-radius:7px;line-height:1.5;display:none;overflow-wrap:anywhere}
+.info{background:#eaf1ff;color:#17386e}
+.success{background:#e6f7eb;color:#14532d}
+.error{background:#feecec;color:#991b1b}
+.note{font-size:13px;color:#68758a;line-height:1.5;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="panel">
+<h1>AYANET</h1>
+<p class="subtitle">Multi-Shop Registration</p>
+
+<form id="registrationForm">
+<label for="shopName">Shop Name</label>
+<input id="shopName" required maxlength="100" placeholder="Enter your shop name">
+
+<label for="email">Email Address</label>
+<input id="email" type="email" required autocomplete="email" placeholder="Enter your email">
+
+<label for="password">Password</label>
+<input id="password" type="password" required minlength="6" autocomplete="new-password" placeholder="At least 6 characters">
+
+<button type="button" id="createButton" class="secondary">
+Create Account & Register Shop
+</button>
+
+<button type="button" id="loginButton">
+Sign In & Register Shop
+</button>
+</form>
+
+<div id="message"></div>
+
+<p class="note">
+New shops are submitted for administrator approval.
+Your shop will remain pending until the AYANET Platform
+Administrator approves it. Each shop's business records
+are kept separate.
+</p>
+</div>
+</div>
+
+<script>
+(function () {
+"use strict";
+
+const SUPABASE_URL =
+"https://jltadhukraspfdaxbvwo.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu";
+
+const db = window.supabase.createClient(
+SUPABASE_URL,
+SUPABASE_KEY
+);
+
+const form = document.getElementById("registrationForm");
+const shopNameInput = document.getElementById("shopName");
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const createButton = document.getElementById("createButton");
+const loginButton = document.getElementById("loginButton");
+const message = document.getElementById("message");
+
+function showMessage(text, type) {
+message.textContent = text;
+message.className = type;
+message.style.display = "block";
+}
+
+function setBusy(busy) {
+createButton.disabled = busy;
+loginButton.disabled = busy;
+createButton.textContent = busy
+? "Please wait..."
+: "Create Account & Register Shop";
+loginButton.textContent = busy
+? "Please wait..."
+: "Sign In & Register Shop";
+}
+
+function getDetails() {
+const shopName = shopNameInput.value.trim();
+const email = emailInput.value.trim();
+const password = passwordInput.value;
+
+if (!shopName) {
+throw new Error("Please enter your shop name.");
+}
+
+if (!email) {
+throw new Error("Please enter your email address.");
+}
+
+if (password.length < 6) {
+throw new Error("Your password must have at least 6 characters.");
+}
+
+return { shopName, email, password };
+}
+
+async function submitShopRegistration() {
+const shopName = shopNameInput.value.trim();
+
+const { data, error } = await db.rpc("register_new_shop", {
+p_shop_name: shopName
+});
+
+if (error) throw error;
+
+showMessage(
+"Your shop registration has been submitted successfully. " +
+"Your shop is PENDING administrator approval. " +
+"Shop reference: " + String(data),
+"success"
+);
+
+shopNameInput.value = "";
+}
+
+async function createAccount() {
+let details;
+
+try {
+details = getDetails();
+} catch (error) {
+showMessage(error.message, "error");
+return;
+}
+
+setBusy(true);
+
+try {
+const { data, error } = await db.auth.signUp({
+email: details.email,
+password: details.password
+});
+
+if (error) throw error;
+
+if (!data.session) {
+showMessage(
+"Your account request was received. Please check your email " +
+"for a confirmation message. After confirming your email, " +
+"return to this page and use Sign In & Register Shop.",
+"info"
+);
+return;
+}
+
+await submitShopRegistration();
+
+} catch (error) {
+showMessage(error.message || "Registration failed.", "error");
+} finally {
+setBusy(false);
+}
+}
+
+async function signInAndRegister() {
+let details;
+
+try {
+details = getDetails();
+} catch (error) {
+showMessage(error.message, "error");
+return;
+}
+
+setBusy(true);
+
+try {
+const { error } = await db.auth.signInWithPassword({
+email: details.email,
+password: details.password
+});
+
+if (error) throw error;
+
+await submitShopRegistration();
+
+} catch (error) {
+showMessage(error.message || "Sign-in or registration failed.", "error");
+} finally {
+setBusy(false);
+}
+}
+
+createButton.addEventListener("click", createAccount);
+loginButton.addEventListener("click", signInAndRegister);
+
+form.addEventListener("submit", function (event) {
+event.preventDefault();
+});
+})();
+</script>
+</body>
+</html>
