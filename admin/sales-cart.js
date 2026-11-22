@@ -1,11 +1,10 @@
 
 /* =====================================
    AYANET MULTI-SHOP SALES CART
-   MULTIPLE PRODUCTS
-   SHOP-SPECIFIC PRODUCT LOADING
+   SHOP-SPECIFIC PRODUCTS
    STOCK VALIDATION
-   ONE RECEIPT PER TRANSACTION
-   DOWNLOADABLE PDF RECEIPT
+   MULTI-PRODUCT SALES
+   PDF RECEIPTS
    KENYA DATE AND TIME
 ===================================== */
 
@@ -41,14 +40,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function makeReceiptNumber() {
-        const now = new Date();
-
         const date = new Intl.DateTimeFormat("en-CA", {
             timeZone: "Africa/Nairobi",
             year: "numeric",
             month: "2-digit",
             day: "2-digit"
-        }).format(now).replace(/-/g, "");
+        }).format(new Date()).replace(/-/g, "");
 
         const random = Math.random().toString(36)
             .substring(2, 8).toUpperCase();
@@ -76,7 +73,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         container.innerHTML = "";
 
-        if (cart.length === 0) {
+        if (!cart.length) {
             container.textContent = "No products added yet.";
             totalElement.textContent = "0.00";
             return;
@@ -94,11 +91,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 item.quantity + " × KSh " + money(item.price) +
                 " = KSh " + money(item.quantity * item.price);
 
-            const quantityButton = document.createElement("button");
-            quantityButton.type = "button";
-            quantityButton.textContent = "Change Quantity";
+            const changeButton = document.createElement("button");
+            changeButton.type = "button";
+            changeButton.textContent = "Change Quantity";
 
-            quantityButton.onclick = function () {
+            changeButton.onclick = function () {
                 const answer = prompt(
                     "Enter new quantity for " + item.name + ":",
                     item.quantity
@@ -118,18 +115,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
                 if (!product) {
-                    showMessage("This product is no longer available in this shop.");
+                    showMessage("This product is no longer available.");
                     return;
                 }
 
                 const otherQuantity = cart.reduce((sum, other, i) => {
-                    return i !== index && String(other.product_id) === String(item.product_id)
-                        ? sum + other.quantity
-                        : sum;
+                    return i !== index &&
+                        String(other.product_id) === String(item.product_id)
+                        ? sum + other.quantity : sum;
                 }, 0);
 
                 if (quantity + otherQuantity > Number(product.stock)) {
-                    alert("Not enough stock. Available stock: " + product.stock);
+                    alert("Not enough stock. Available: " + product.stock);
                     return;
                 }
 
@@ -146,7 +143,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 renderCart();
             };
 
-            card.append(name, details, quantityButton, removeButton);
+            card.append(name, details, changeButton, removeButton);
             container.appendChild(card);
         });
 
@@ -155,7 +152,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     async function loadCartProducts() {
         const select = get("cartProduct");
-
         if (!select) return;
 
         const shopId = currentShopId();
@@ -169,7 +165,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!shopId) {
             first.textContent = "Select a shop first";
             select.appendChild(first);
-            showMessage("Select a shop before recording sales.");
+            showMessage("Waiting for your shop selection...");
             return;
         }
 
@@ -187,7 +183,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (error) throw error;
 
-            // Ignore an old request if the user changed shops.
             if (currentShopId() !== shopId) return;
 
             products = data || [];
@@ -209,10 +204,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 select.appendChild(productOption);
             });
 
-            if (products.length === 0) {
-                showMessage("No products found in this shop. Add products first.");
+            if (!products.length) {
+                showMessage("No products found in this shop.");
             } else {
-                showMessage("Shop products loaded. You can start adding items.");
+                showMessage("Shop products loaded. You can add items.");
             }
 
         } catch (error) {
@@ -285,7 +280,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 product_id: product.id,
                 name: product.name,
                 price: Number(product.price),
-                quantity
+                quantity: quantity
             });
         }
 
@@ -304,20 +299,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             if (!window.jspdf || !window.jspdf.jsPDF) {
-                throw new Error(
-                    "PDF service is unavailable. Check your internet connection."
-                );
+                throw new Error("PDF service is unavailable.");
             }
 
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-
             const receipt = lastReceipt;
             const pageWidth = doc.internal.pageSize.getWidth();
 
             doc.setFont("helvetica", "bold");
             doc.setFontSize(22);
-            doc.text("AYANET", pageWidth / 2, 20, { align: "center" });
+            doc.text("AYANET", pageWidth / 2, 20, {
+                align: "center"
+            });
 
             doc.setFontSize(12);
             doc.text("SHOP MANAGEMENT", pageWidth / 2, 28, {
@@ -347,8 +341,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             doc.text(
                 "Customer: " + (receipt.customer || "Walk-in Customer"),
-                15,
-                y
+                15, y
             );
 
             y += 12;
@@ -357,7 +350,9 @@ document.addEventListener("DOMContentLoaded", function () {
             doc.text("ITEM", 15, y);
             doc.text("QTY", 112, y);
             doc.text("PRICE", 135, y);
-            doc.text("TOTAL", pageWidth - 15, y, { align: "right" });
+            doc.text("TOTAL", pageWidth - 15, y, {
+                align: "right"
+            });
 
             y += 3;
             doc.line(15, y, pageWidth - 15, y);
@@ -376,12 +371,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 doc.text(itemName, 15, y);
                 doc.text(String(item.quantity), 112, y);
                 doc.text(money(item.price), 135, y);
-                doc.text(
-                    money(item.total),
-                    pageWidth - 15,
-                    y,
-                    { align: "right" }
-                );
+                doc.text(money(item.total), pageWidth - 15, y, {
+                    align: "right"
+                });
 
                 y += Math.max(8, itemName.length * 5);
             });
@@ -395,8 +387,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             doc.text(
                 "GRAND TOTAL: KSh " + money(receipt.total),
-                pageWidth - 15,
-                y,
+                pageWidth - 15, y,
                 { align: "right" }
             );
 
@@ -407,8 +398,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             doc.text(
                 "Thank you for shopping with AYANET!",
-                pageWidth / 2,
-                y,
+                pageWidth / 2, y,
                 { align: "center" }
             );
 
@@ -416,23 +406,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
             doc.text(
                 "We appreciate your business.",
-                pageWidth / 2,
-                y,
+                pageWidth / 2, y,
                 { align: "center" }
             );
 
             doc.save(receipt.number + ".pdf");
-
             showMessage("Receipt downloaded successfully.");
 
         } catch (error) {
             console.error("Receipt error:", error);
-
-            showMessage(
-                "Sale was saved, but receipt download failed: " +
-                error.message +
-                ". Use Download Last Receipt to try again."
-            );
+            showMessage("Receipt download failed: " + error.message);
         }
     }
 
@@ -446,12 +429,11 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        if (cart.length === 0) {
+        if (!cart.length) {
             showMessage("Your cart is empty. Add products first.");
             return;
         }
 
-        // Make sure every cart item belongs to the selected shop.
         const invalidItem = cart.some(item =>
             !products.some(product =>
                 String(product.id) === String(item.product_id)
@@ -459,12 +441,13 @@ document.addEventListener("DOMContentLoaded", function () {
         );
 
         if (invalidItem) {
-            showMessage("The cart contains an item from another shop. Clear the cart and try again.");
+            showMessage("The cart contains an item from another shop.");
             return;
         }
 
         const customerElement = get("cartCustomerName");
-        const customer = customerElement ? customerElement.value.trim() : "";
+        const customer = customerElement
+            ? customerElement.value.trim() : "";
 
         const total = calculateTotal();
 
@@ -476,7 +459,6 @@ document.addEventListener("DOMContentLoaded", function () {
         )) return;
 
         const button = get("completeCartSaleButton");
-
         savingSale = true;
 
         if (button) {
@@ -501,10 +483,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (error) throw error;
 
-            if (!data || data.length === 0) {
-                throw new Error(
-                    "The database returned no sale records. Please check the sales history before trying again."
-                );
+            if (!data || !data.length) {
+                throw new Error("The database returned no sale records.");
             }
 
             const savedItems = data.map(row => ({
@@ -515,14 +495,13 @@ document.addEventListener("DOMContentLoaded", function () {
             }));
 
             const savedTotal = savedItems.reduce(
-                (sum, item) => sum + item.total,
-                0
+                (sum, item) => sum + item.total, 0
             );
 
             lastReceipt = {
                 number: receiptNumber,
                 date: kenyaDateTime(),
-                customer,
+                customer: customer,
                 shopName: window.AYANET_CURRENT_SHOP_NAME || "",
                 items: savedItems,
                 total: savedTotal
@@ -531,31 +510,25 @@ document.addEventListener("DOMContentLoaded", function () {
             cart = [];
             renderCart();
 
-            if (customerElement) {
-                customerElement.value = "";
-            }
+            if (customerElement) customerElement.value = "";
 
             showMessage(
                 "Sale saved successfully! Receipt: " + receiptNumber
             );
 
             downloadReceipt();
-
             await loadCartProducts();
 
             if (confirm(
                 "Sale saved successfully.\n\n" +
-                "Would you like to refresh the dashboard now so stock, sales history and reports update?"
+                "Refresh the dashboard so stock and reports update?"
             )) {
                 window.location.reload();
             }
 
         } catch (error) {
             console.error("Multi-product sale error:", error);
-
-            showMessage(
-                "Sale could not be completed: " + error.message
-            );
+            showMessage("Sale could not be completed: " + error.message);
 
         } finally {
             savingSale = false;
@@ -567,21 +540,16 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    // Add products to cart.
     const addButton = get("addCartItemButton");
-
     if (addButton) {
         addButton.addEventListener("click", addCartItem);
     }
 
-    // Complete the sale.
     const completeButton = get("completeCartSaleButton");
-
     if (completeButton) {
         completeButton.addEventListener("click", completeCartSale);
     }
 
-    // Product refresh button.
     const refreshButton = document.createElement("button");
     refreshButton.type = "button";
     refreshButton.textContent = "Load / Refresh Products";
@@ -597,22 +565,29 @@ document.addEventListener("DOMContentLoaded", function () {
         refreshButton.addEventListener("click", loadCartProducts);
     }
 
-    // When the selected shop changes, clear the old shop's cart.
-    document.addEventListener("ayanet-shop-changed", function () {
+    const downloadButton = get("downloadLastReceiptButton");
+    if (downloadButton) {
+        downloadButton.addEventListener("click", downloadReceipt);
+    }
+
+    /*
+       IMPORTANT FIX:
+       admin.js dispatches this event on WINDOW.
+       The cart must therefore listen on WINDOW too.
+    */
+    window.addEventListener("ayanet-shop-changed", function () {
         cart = [];
         products = [];
         lastReceipt = null;
 
         renderCart();
-        loadCartProducts();
 
         showMessage("Shop changed. Products are being refreshed.");
+        loadCartProducts();
     });
 
-    // Initial cart display.
     renderCart();
 
-    // Respond to authentication changes.
     db.auth.onAuthStateChange(function (event, session) {
         if (session && (
             event === "SIGNED_IN" ||
