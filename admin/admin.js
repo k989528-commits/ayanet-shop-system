@@ -1,19 +1,18 @@
 
 /* =====================================
-   AYANET ADMIN DASHBOARD
+   AYANET MULTI-SHOP ADMIN DASHBOARD
+   SHOP-SCOPED RECORDS
    PRODUCTS + BUYING COST + SELLING PRICE
    LOW STOCK + SMART RESTOCK
    SALES + SHOP EXPENSES
    DAILY + MONTHLY FINANCIAL REPORTS
    SERVICE MANAGEMENT
-   COMPLETED ORDER DELETION
+   CUSTOMER ORDERS + ALERTS
    PRINTING DOCUMENT VIEW / DOWNLOAD
-   NEW ORDER BEEP + AUTOMATIC REFRESH
    PAYMENT DETAILS + WHATSAPP + SMS
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
-
     const db = window.supabase.createClient(
         "https://jltadhukraspfdaxbvwo.supabase.co",
         "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu"
@@ -24,8 +23,21 @@ document.addEventListener("DOMContentLoaded", function () {
     const SHOP_TIMEZONE = "Africa/Nairobi";
     const STORAGE_BUCKET = "printing-documents";
 
+    let currentShopId = null;
+    let currentShopName = "";
+    let orderCheckTimer = null;
+    let knownOrderIds = new Set();
+    let ordersLoadedOnce = false;
+    let orderAudioContext = null;
+    let orderAlertsEnabled = false;
+    let orderLoadInProgress = false;
+
     function money(value) {
         return Number(value || 0).toFixed(2);
+    }
+
+    function shopQuery(table) {
+        return db.from(table).select("*").eq("shop_id", currentShopId);
     }
 
     function getKenyaDateKey(date) {
@@ -49,45 +61,161 @@ document.addEventListener("DOMContentLoaded", function () {
             month: "2-digit"
         }).formatToParts(date);
 
-        const year = parts.find(p => p.type === "year").value;
-        const month = parts.find(p => p.type === "month").value;
-
-        return year + "-" + month;
+        return parts.find(p => p.type === "year").value + "-" +
+            parts.find(p => p.type === "month").value;
     }
 
-    // =====================================
-    // COUNT REAL TRANSACTIONS
-    // One receipt number = one transaction.
-    // Old sales without receipt numbers count
-    // individually, one sale row per transaction.
-    // =====================================
-
     function countTransactions(sales) {
-        const receiptNumbers = new Set();
+        const receipts = new Set();
         let olderTransactions = 0;
 
         sales.forEach(sale => {
-            const receiptNumber = String(
-                sale.receipt_number || ""
-            ).trim();
-
-            if (receiptNumber) {
-                receiptNumbers.add(receiptNumber);
-            } else {
-                olderTransactions++;
-            }
+            const receipt = String(sale.receipt_number || "").trim();
+            if (receipt) receipts.add(receipt);
+            else olderTransactions++;
         });
 
-        return receiptNumbers.size + olderTransactions;
+        return receipts.size + olderTransactions;
     }
 
-    function showDashboard(isLoggedIn) {
-        get("loginSection").style.display = isLoggedIn ? "none" : "block";
-        get("adminDashboard").style.display = isLoggedIn ? "block" : "none";
+    function showDashboard(loggedIn) {
+        get("loginSection").style.display = loggedIn ? "none" : "block";
+        get("adminDashboard").style.display = loggedIn ? "block" : "none";
+    }
+
+    function announceShopChange() {
+        window.AYANET_CURRENT_SHOP_ID = currentShopId;
+        window.AYANET_CURRENT_SHOP_NAME = currentShopName;
+
+        window.dispatchEvent(new CustomEvent("ayanet-shop-changed", {
+            detail: {
+                shopId: currentShopId,
+                shopName: currentShopName
+            }
+        }));
+    }
+
+    function createShopSelector(shops) {
+        let area = get("shopSelectorArea");
+
+        if (!area) {
+            area = document.createElement("div");
+            area.id = "shopSelectorArea";
+            area.style.padding = "15px";
+            area.style.margin = "15px 0";
+            area.style.border = "1px solid #ccc";
+            area.style.borderRadius = "8px";
+
+            const header = document.querySelector("#adminDashboard header");
+            if (header) header.insertAdjacentElement("afterend", area);
+            else get("adminDashboard").prepend(area);
+        }
+
+        area.innerHTML = "";
+
+        const label = document.createElement("label");
+        label.textContent = "Current shop: ";
+        label.style.fontWeight = "bold";
+
+        const select = document.createElement("select");
+        select.id = "currentShopSelect";
+        select.style.padding = "10px";
+        select.style.margin = "5px";
+        select.style.maxWidth = "100%";
+
+        shops.forEach(shop => {
+            const option = document.createElement("option");
+            option.value = shop.id;
+            option.textContent = shop.name + " (" + shop.status.toUpperCase() + ")";
+            select.appendChild(option);
+        });
+
+        const savedId = sessionStorage.getItem("ayanet_current_shop");
+        const savedShop = shops.find(s => s.id === savedId);
+        const defaultShop = savedShop || shops.find(s => s.status === "active") || shops[0];
+
+        select.value = defaultShop.id;
+        currentShopId = defaultShop.id;
+        currentShopName = defaultShop.name;
+
+        const status = document.createElement("p");
+        status.id = "currentShopStatus";
+        status.textContent = "Managing: " + currentShopName +
+            " — " + defaultShop.status.toUpperCase();
+
+        label.appendChild(select);
+        area.append(label, status);
+
+        select.addEventListener("change", async function () {
+            const shop = shops.find(s => s.id === select.value);
+            if (!shop) return;
+
+            currentShopId = shop.id;
+            currentShopName = shop.name;
+            sessionStorage.setItem("ayanet_current_shop", shop.id);
+
+            status.textContent = "Managing: " + shop.name +
+                " — " + shop.status.toUpperCase();
+
+            knownOrderIds = new Set();
+            ordersLoadedOnce = false;
+
+            announceShopChange();
+            await refreshAllDashboardData();
+        });
+
+        sessionStorage.setItem("ayanet_current_shop", currentShopId);
+        announceShopChange();
+    }
+
+    async function loadAvailableShops(userId) {
+        const { data: adminRecord, error: adminError } = await db
+            .from("platform_admins")
+            .select("user_id")
+            .eq("user_id", userId)
+            .maybeSingle();
+
+        if (adminError) throw adminError;
+
+        const { data: shops, error: shopsError } = await db
+            .from("shops")
+            .select("id,name,slug,status")
+            .order("name");
+
+        if (shopsError) throw shopsError;
+
+        const available = shops || [];
+
+        if (!available.length) {
+            throw new Error("No shops are linked to this account yet.");
+        }
+
+        if (!adminRecord) {
+            const { data: memberships, error: membershipError } = await db
+                .from("shop_members")
+                .select("shop_id")
+                .eq("user_id", userId);
+
+            if (membershipError) throw membershipError;
+
+            const allowedIds = new Set(
+                (memberships || []).map(m => m.shop_id)
+            );
+
+            const memberShops = available.filter(s => allowedIds.has(s.id));
+
+            if (!memberShops.length) {
+                throw new Error("Your account has no shop membership.");
+            }
+
+            createShopSelector(memberShops);
+        } else {
+            createShopSelector(available);
+        }
     }
 
     // =====================================
-    // ADMIN LOGIN
+    // LOGIN
     // =====================================
 
     get("adminLoginForm").addEventListener("submit", async function (e) {
@@ -109,18 +237,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
             message.textContent = "Login successful!";
             await startDashboard();
-
         } catch (error) {
             message.textContent = "Error: " + error.message;
         }
     });
 
     // =====================================
-    // SERVICE MANAGEMENT
+    // SERVICES
     // =====================================
 
     get("serviceForm").addEventListener("submit", async function (e) {
         e.preventDefault();
+
+        if (!currentShopId) return;
 
         const message = get("serviceMessage");
         const category = get("serviceCategory").value.trim();
@@ -141,6 +270,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const { error } = await db.from("services").insert([{
+                shop_id: currentShopId,
                 category,
                 service_name: serviceName,
                 description,
@@ -148,18 +278,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 is_active: true
             }]);
 
-            if (error) {
-                message.textContent = "Could not add service: " + error.message;
-                return;
-            }
+            if (error) throw error;
 
             message.textContent = "Service added successfully!";
             this.reset();
             await loadServices();
-
         } catch (error) {
-            message.textContent = "Service error: " + error.message;
-
+            message.textContent = "Could not add service: " + error.message;
         } finally {
             button.disabled = false;
         }
@@ -168,9 +293,7 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadServices() {
         const container = get("services");
 
-        const { data, error } = await db
-            .from("services")
-            .select("*")
+        const { data, error } = await shopQuery("services")
             .order("category")
             .order("service_name");
 
@@ -181,7 +304,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         container.innerHTML = "";
 
-        if (!data || data.length === 0) {
+        if (!data || !data.length) {
             container.textContent = "No services added yet.";
             return;
         }
@@ -210,36 +333,33 @@ document.addEventListener("DOMContentLoaded", function () {
                 name.textContent = service.service_name;
 
                 const description = document.createElement("p");
-                description.textContent = service.description || "No description provided.";
+                description.textContent =
+                    service.description || "No description provided.";
 
                 const price = document.createElement("p");
                 price.textContent = "Customer price: KSh " + money(service.price);
 
                 const status = document.createElement("p");
-                status.textContent = service.is_active ? "Status: ACTIVE" : "Status: INACTIVE";
+                status.textContent =
+                    service.is_active ? "Status: ACTIVE" : "Status: INACTIVE";
 
-                const editButton = document.createElement("button");
-                editButton.type = "button";
-                editButton.textContent = "Edit Service";
-                editButton.onclick = () => editService(service);
+                const edit = document.createElement("button");
+                edit.type = "button";
+                edit.textContent = "Edit Service";
+                edit.onclick = () => editService(service);
 
-                const toggleButton = document.createElement("button");
-                toggleButton.type = "button";
-                toggleButton.textContent = service.is_active
-                    ? "Deactivate Service"
-                    : "Activate Service";
-                toggleButton.onclick = () => toggleService(service);
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.textContent =
+                    service.is_active ? "Deactivate Service" : "Activate Service";
+                toggle.onclick = () => toggleService(service);
 
-                const deleteButton = document.createElement("button");
-                deleteButton.type = "button";
-                deleteButton.textContent = "Delete Service";
-                deleteButton.onclick = () => deleteService(service);
+                const remove = document.createElement("button");
+                remove.type = "button";
+                remove.textContent = "Delete Service";
+                remove.onclick = () => deleteService(service);
 
-                card.append(
-                    name, description, price, status,
-                    editButton, toggleButton, deleteButton
-                );
-
+                card.append(name, description, price, status, edit, toggle, remove);
                 categoryCard.appendChild(card);
             });
 
@@ -251,8 +371,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const category = prompt("Enter service category:", service.category);
         if (category === null) return;
 
-        const serviceName = prompt("Enter service name:", service.service_name);
-        if (serviceName === null) return;
+        const name = prompt("Enter service name:", service.service_name);
+        if (name === null) return;
 
         const description = prompt(
             "Enter service description:", service.description || ""
@@ -264,7 +384,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const price = Number(priceInput);
 
-        if (!category.trim() || !serviceName.trim() ||
+        if (!category.trim() || !name.trim() ||
             priceInput.trim() === "" || !Number.isFinite(price) || price < 0) {
             alert("Please enter valid service information.");
             return;
@@ -273,11 +393,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const { error } = await db.from("services")
             .update({
                 category: category.trim(),
-                service_name: serviceName.trim(),
+                service_name: name.trim(),
                 description: description.trim(),
                 price
             })
-            .eq("id", service.id);
+            .eq("id", service.id)
+            .eq("shop_id", currentShopId);
 
         if (error) {
             alert("Service update failed: " + error.message);
@@ -297,7 +418,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         const { error } = await db.from("services")
             .update({ is_active: newStatus })
-            .eq("id", service.id);
+            .eq("id", service.id)
+            .eq("shop_id", currentShopId);
 
         if (error) {
             alert("Could not update service: " + error.message);
@@ -308,13 +430,12 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function deleteService(service) {
-        if (!confirm(
-            'Permanently delete "' + service.service_name + '"?'
-        )) return;
+        if (!confirm('Permanently delete "' + service.service_name + '"?')) return;
 
         const { error } = await db.from("services")
             .delete()
-            .eq("id", service.id);
+            .eq("id", service.id)
+            .eq("shop_id", currentShopId);
 
         if (error) {
             alert("Could not delete service: " + error.message);
@@ -326,15 +447,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================
-    // CUSTOMER ORDERS + NEW ORDER ALERTS
+    // ORDER ALERTS
     // =====================================
-
-    let knownOrderIds = new Set();
-    let ordersLoadedOnce = false;
-    let orderCheckTimer = null;
-    let orderAudioContext = null;
-    let orderAlertsEnabled = false;
-    let orderLoadInProgress = false;
 
     function playOrderBeep() {
         if (!orderAlertsEnabled) return;
@@ -359,27 +473,18 @@ document.addEventListener("DOMContentLoaded", function () {
             oscillator.type = "sine";
             oscillator.frequency.value = 880;
 
-            gain.gain.setValueAtTime(
-                0.0001,
-                orderAudioContext.currentTime
-            );
-
+            gain.gain.setValueAtTime(0.0001, orderAudioContext.currentTime);
             gain.gain.exponentialRampToValueAtTime(
-                0.25,
-                orderAudioContext.currentTime + 0.03
+                0.25, orderAudioContext.currentTime + 0.03
             );
-
             gain.gain.exponentialRampToValueAtTime(
-                0.0001,
-                orderAudioContext.currentTime + 0.45
+                0.0001, orderAudioContext.currentTime + 0.45
             );
 
             oscillator.connect(gain);
             gain.connect(orderAudioContext.destination);
-
             oscillator.start();
             oscillator.stop(orderAudioContext.currentTime + 0.5);
-
         } catch (error) {
             console.error("Order beep error:", error);
         }
@@ -390,11 +495,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if ("Notification" in window &&
             Notification.permission === "granted") {
-
             try {
                 new Notification("New AYANET Customer Order", {
-                    body:
-                        (order.customer_name || "Customer") +
+                    body: (order.customer_name || "Customer") +
                         " has placed an order.",
                     icon: "../admin/icon-192.png"
                 });
@@ -428,10 +531,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     "This browser does not support computer sound alerts.";
             }
 
-            if ("Notification" in window) {
-                if (Notification.permission === "default") {
-                    await Notification.requestPermission();
-                }
+            if ("Notification" in window &&
+                Notification.permission === "default") {
+                await Notification.requestPermission();
             }
 
             if (orderAlertsEnabled) {
@@ -439,29 +541,20 @@ document.addEventListener("DOMContentLoaded", function () {
                     "Order sound alerts are enabled. Keep this dashboard open.";
                 button.textContent = "Order Alerts Enabled";
             }
-
         } catch (error) {
             console.error("Could not enable order alerts:", error);
             status.textContent =
-                "Could not enable sound alerts. Check your browser settings.";
+                "Could not enable sound alerts. Check browser settings.";
         }
     }
 
-    const enableOrderSoundButton = get("enableOrderSound");
-
-    if (enableOrderSoundButton) {
-        enableOrderSoundButton.addEventListener(
-            "click",
-            enableOrderAlerts
-        );
-    }
+    get("enableOrderSound").addEventListener("click", enableOrderAlerts);
 
     function getCustomerPhone(phone) {
         let number = String(phone || "").replace(/\D/g, "");
 
-        if (number.startsWith("0")) {
-            number = "254" + number.substring(1);
-        } else if (number.startsWith("7") || number.startsWith("1")) {
+        if (number.startsWith("0")) number = "254" + number.substring(1);
+        else if (number.startsWith("7") || number.startsWith("1")) {
             number = "254" + number;
         }
 
@@ -469,9 +562,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function getReadyMessage(order) {
-        const customerName = order.customer_name || "Customer";
-
-        return "Hello " + customerName +
+        return "Hello " + (order.customer_name || "Customer") +
             "! Your order from AYANET is ready for collection. " +
             "Thank you for choosing AYANET!";
     }
@@ -484,11 +575,12 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const message = encodeURIComponent(getReadyMessage(order));
-        const whatsappUrl =
-            "https://wa.me/" + phone + "?text=" + message;
-
-        window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+        window.open(
+            "https://wa.me/" + phone + "?text=" +
+            encodeURIComponent(getReadyMessage(order)),
+            "_blank",
+            "noopener,noreferrer"
+        );
     }
 
     function sendReadySMS(order) {
@@ -499,10 +591,11 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const message = encodeURIComponent(getReadyMessage(order));
-        const smsUrl = "sms:" + phone + "?body=" + message;
-
-        window.open(smsUrl, "_blank");
+        window.open(
+            "sms:" + phone + "?body=" +
+            encodeURIComponent(getReadyMessage(order)),
+            "_blank"
+        );
     }
 
     async function openPrintingDocument(order, button) {
@@ -525,7 +618,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 );
 
             if (error) throw error;
-
             if (!data || !data.signedUrl) {
                 throw new Error("Could not create a secure document link.");
             }
@@ -538,11 +630,8 @@ document.addEventListener("DOMContentLoaded", function () {
             document.body.appendChild(link);
             link.click();
             link.remove();
-
         } catch (error) {
-            console.error("Document access error:", error);
             alert("Could not open document: " + error.message);
-
         } finally {
             button.disabled = false;
             button.textContent = originalText;
@@ -550,38 +639,27 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     async function loadOrders() {
-        if (orderLoadInProgress) return;
-
+        if (orderLoadInProgress || !currentShopId) return;
         orderLoadInProgress = true;
 
         const container = get("orders");
 
         try {
-            const { data, error } = await db.from("orders")
-                .select("*")
+            const { data, error } = await shopQuery("orders")
                 .order("created_at", { ascending: false });
 
-            if (error) {
-                container.textContent =
-                    "Failed to load orders: " + error.message;
-                return;
-            }
+            if (error) throw error;
 
             const orders = data || [];
 
             if (!ordersLoadedOnce) {
-                orders.forEach(order => {
-                    knownOrderIds.add(String(order.id));
-                });
-
+                orders.forEach(order => knownOrderIds.add(String(order.id)));
                 ordersLoadedOnce = true;
-
             } else {
                 orders.forEach(order => {
-                    const orderId = String(order.id);
-
-                    if (!knownOrderIds.has(orderId)) {
-                        knownOrderIds.add(orderId);
+                    const id = String(order.id);
+                    if (!knownOrderIds.has(id)) {
+                        knownOrderIds.add(id);
                         notifyNewOrder(order);
                     }
                 });
@@ -589,7 +667,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
             container.innerHTML = "";
 
-            if (orders.length === 0) {
+            if (!orders.length) {
                 container.textContent = "No customer orders yet.";
                 return;
             }
@@ -602,129 +680,96 @@ document.addEventListener("DOMContentLoaded", function () {
                 heading.textContent = order.customer_name || "Customer";
 
                 const phone = document.createElement("p");
-                phone.textContent =
-                    "Phone: " + (order.customer_phone || "Not provided");
+                phone.textContent = "Phone: " +
+                    (order.customer_phone || "Not provided");
 
                 const service = document.createElement("p");
-                service.textContent =
-                    "Service: " + (order.service_name || "");
+                service.textContent = "Service: " + (order.service_name || "");
 
                 const details = document.createElement("p");
-                details.textContent =
-                    "Details: " + (order.order_details || "");
+                details.textContent = "Details: " + (order.order_details || "");
 
                 const status = document.createElement("p");
-                status.textContent =
-                    "Status: " + (order.status || "Pending");
+                status.textContent = "Status: " + (order.status || "Pending");
 
                 const paymentMethod = document.createElement("p");
-                paymentMethod.textContent =
-                    "Payment method: " +
+                paymentMethod.textContent = "Payment method: " +
                     (order.payment_method || "Not recorded");
 
                 const paymentStatus = document.createElement("p");
-                paymentStatus.textContent =
-                    "Payment status: " +
+                paymentStatus.textContent = "Payment status: " +
                     (order.payment_status || "Not recorded");
 
                 const mpesaCode = document.createElement("p");
-                mpesaCode.textContent =
-                    "M-Pesa confirmation code: " +
+                mpesaCode.textContent = "M-Pesa confirmation code: " +
                     (order.mpesa_code || "Not provided");
 
                 card.append(
-                    heading,
-                    phone,
-                    service,
-                    details,
-                    status,
-                    paymentMethod,
-                    paymentStatus,
-                    mpesaCode
+                    heading, phone, service, details, status,
+                    paymentMethod, paymentStatus, mpesaCode
                 );
 
                 if (order.document_url) {
-                    const documentInfo = document.createElement("p");
-                    documentInfo.textContent =
-                        "Printing document: " +
+                    const info = document.createElement("p");
+                    info.textContent = "Printing document: " +
                         (order.document_name || "Customer document");
 
                     const documentButton = document.createElement("button");
                     documentButton.type = "button";
-                    documentButton.textContent =
-                        "View / Download Document";
-
-                    documentButton.addEventListener("click", function () {
+                    documentButton.textContent = "View / Download Document";
+                    documentButton.onclick = () =>
                         openPrintingDocument(order, documentButton);
-                    });
 
-                    card.append(documentInfo, documentButton);
+                    card.append(info, documentButton);
                 }
 
                 if (order.status === "Completed") {
                     const completed = document.createElement("p");
                     completed.textContent = "Order completed!";
-                    card.appendChild(completed);
 
-                    const whatsappButton = document.createElement("button");
-                    whatsappButton.type = "button";
-                    whatsappButton.textContent = "Message on WhatsApp";
-                    whatsappButton.onclick =
-                        () => sendReadyWhatsApp(order);
+                    const whatsapp = document.createElement("button");
+                    whatsapp.type = "button";
+                    whatsapp.textContent = "Message on WhatsApp";
+                    whatsapp.onclick = () => sendReadyWhatsApp(order);
 
-                    const smsButton = document.createElement("button");
-                    smsButton.type = "button";
-                    smsButton.textContent = "Send SMS";
-                    smsButton.onclick =
-                        () => sendReadySMS(order);
+                    const sms = document.createElement("button");
+                    sms.type = "button";
+                    sms.textContent = "Send SMS";
+                    sms.onclick = () => sendReadySMS(order);
 
-                    const deleteButton = document.createElement("button");
-                    deleteButton.type = "button";
-                    deleteButton.textContent = "Delete Completed Order";
-                    deleteButton.onclick =
-                        () => deleteCompletedOrder(order.id);
+                    const remove = document.createElement("button");
+                    remove.type = "button";
+                    remove.textContent = "Delete Completed Order";
+                    remove.onclick = () => deleteCompletedOrder(order.id);
 
-                    card.append(
-                        whatsappButton,
-                        smsButton,
-                        deleteButton
-                    );
-
+                    card.append(completed, whatsapp, sms, remove);
                 } else {
-                    const button = document.createElement("button");
-                    button.type = "button";
-                    button.textContent = "Mark as Completed";
-                    button.onclick = () => completeOrder(order.id);
-                    card.appendChild(button);
+                    const complete = document.createElement("button");
+                    complete.type = "button";
+                    complete.textContent = "Mark as Completed";
+                    complete.onclick = () => completeOrder(order.id);
+                    card.appendChild(complete);
                 }
 
                 container.appendChild(card);
             });
-
         } catch (error) {
-            console.error("Order loading error:", error);
-            container.textContent =
-                "Could not load orders: " + error.message;
-
+            container.textContent = "Could not load orders: " + error.message;
         } finally {
             orderLoadInProgress = false;
         }
     }
 
     function startOrderMonitoring() {
-        if (orderCheckTimer) {
-            clearInterval(orderCheckTimer);
-        }
-
-        orderCheckTimer = setInterval(function () {
-            loadOrders();
-        }, 15000);
+        if (orderCheckTimer) clearInterval(orderCheckTimer);
+        orderCheckTimer = setInterval(loadOrders, 15000);
     }
 
     async function completeOrder(orderId) {
         const { error } = await db.from("orders")
             .update({ status: "Completed" })
-            .eq("id", orderId);
+            .eq("id", orderId)
+            .eq("shop_id", currentShopId);
 
         if (error) {
             alert("Could not update order: " + error.message);
@@ -732,11 +777,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         await loadOrders();
-
-        alert(
-            "Order marked as completed!\n\n" +
-            "You can now use the WhatsApp or SMS button to notify the customer."
-        );
+        alert("Order marked as completed! You can now notify the customer.");
     }
 
     async function deleteCompletedOrder(orderId) {
@@ -747,6 +788,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const { error } = await db.from("orders")
             .delete()
             .eq("id", orderId)
+            .eq("shop_id", currentShopId)
             .eq("status", "Completed");
 
         if (error) {
@@ -765,37 +807,39 @@ document.addEventListener("DOMContentLoaded", function () {
     get("productForm").addEventListener("submit", async function (e) {
         e.preventDefault();
 
+        if (!currentShopId) return;
+
         const message = get("productMessage");
         const name = get("productName").value.trim();
         const description = get("productDescription").value.trim();
-
-        const costPriceInput = get("productCostPrice").value;
+        const costInput = get("productCostPrice").value;
         const priceInput = get("productPrice").value;
         const stockInput = get("productStock").value;
 
-        const costPrice = Number(costPriceInput);
+        const cost = Number(costInput);
         const price = Number(priceInput);
         const stock = Number(stockInput);
 
-        if (!name || costPriceInput === "" || priceInput === "" ||
-            stockInput === "" || !Number.isFinite(costPrice) ||
-            !Number.isFinite(price) || costPrice <= 0 || price <= 0 ||
+        if (!name || costInput === "" || priceInput === "" ||
+            stockInput === "" || !Number.isFinite(cost) ||
+            !Number.isFinite(price) || cost <= 0 || price <= 0 ||
             stock < 0 || !Number.isInteger(stock)) {
             message.textContent =
                 "Please enter valid buying price, selling price and stock.";
             return;
         }
 
-        if (price < costPrice && !confirm(
+        if (price < cost && !confirm(
             "Warning: Selling price is lower than buying cost. Continue?"
         )) return;
 
         message.textContent = "Adding product...";
 
         const { error } = await db.from("products").insert([{
+            shop_id: currentShopId,
             name,
             description,
-            cost_price: costPrice,
+            cost_price: cost,
             price,
             stock
         }]);
@@ -818,8 +862,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const container = get("products");
         const saleProduct = get("saleProduct");
 
-        const { data, error } = await db.from("products")
-            .select("*")
+        const { data, error } = await shopQuery("products")
             .order("created_at", { ascending: false });
 
         if (error) {
@@ -829,21 +872,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
         saleProduct.innerHTML = "";
 
-        const firstOption = document.createElement("option");
-        firstOption.value = "";
-        firstOption.textContent = "Choose a product";
-        saleProduct.appendChild(firstOption);
+        const first = document.createElement("option");
+        first.value = "";
+        first.textContent = "Choose a product";
+        saleProduct.appendChild(first);
 
         (data || []).forEach(product => {
             const option = document.createElement("option");
             option.value = product.id;
-            option.textContent = product.name + " - Stock: " + product.stock;
+            option.textContent =
+                product.name + " - Stock: " + product.stock;
             saleProduct.appendChild(option);
         });
 
         container.innerHTML = "";
 
-        if (!data || data.length === 0) {
+        if (!data || !data.length) {
             container.textContent = "No products added yet.";
             return;
         }
@@ -863,33 +907,24 @@ document.addEventListener("DOMContentLoaded", function () {
             const price = document.createElement("p");
             const profit = document.createElement("p");
 
-            price.textContent =
-                "Selling price: KSh " + money(product.price);
+            price.textContent = "Selling price: KSh " + money(product.price);
 
             if (product.cost_price !== null &&
                 product.cost_price !== undefined) {
-                const buyingCost = Number(product.cost_price);
-                const sellingPrice = Number(product.price);
-
                 cost.textContent =
-                    "Average buying cost: KSh " + money(buyingCost);
+                    "Average buying cost: KSh " + money(product.cost_price);
 
-                profit.textContent =
-                    "Profit per item: KSh " +
-                    money(sellingPrice - buyingCost);
+                profit.textContent = "Profit per item: KSh " +
+                    money(Number(product.price) - Number(product.cost_price));
             } else {
-                cost.textContent =
-                    "Average buying cost: Not entered yet";
-
-                profit.textContent =
-                    "Profit per item: Not available";
+                cost.textContent = "Average buying cost: Not entered yet";
+                profit.textContent = "Profit per item: Not available";
             }
 
             const stock = document.createElement("p");
             stock.textContent = "Stock: " + product.stock;
 
             const stockStatus = document.createElement("p");
-
             if (Number(product.stock) === 0) {
                 stockStatus.textContent = "OUT OF STOCK";
             } else if (Number(product.stock) <= LOW_STOCK_LEVEL) {
@@ -898,22 +933,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 stockStatus.textContent = "IN STOCK";
             }
 
-            const restockButton = document.createElement("button");
-            restockButton.textContent = "Restock Product";
-            restockButton.onclick = () => restockProduct(product);
+            const restock = document.createElement("button");
+            restock.type = "button";
+            restock.textContent = "Restock Product";
+            restock.onclick = () => restockProduct(product);
 
-            const editButton = document.createElement("button");
-            editButton.textContent = "Edit Product";
-            editButton.onclick = () => editProduct(card, product);
+            const edit = document.createElement("button");
+            edit.type = "button";
+            edit.textContent = "Edit Product";
+            edit.onclick = () => editProduct(card, product);
 
-            const deleteButton = document.createElement("button");
-            deleteButton.textContent = "Delete Product";
-            deleteButton.onclick =
-                () => deleteProduct(product.id, product.name);
+            const remove = document.createElement("button");
+            remove.type = "button";
+            remove.textContent = "Delete Product";
+            remove.onclick = () => deleteProduct(product.id, product.name);
 
             card.append(
                 heading, description, cost, price, profit,
-                stock, stockStatus, restockButton, editButton, deleteButton
+                stock, stockStatus, restock, edit, remove
             );
 
             container.appendChild(card);
@@ -921,19 +958,18 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================
-    // SMART RESTOCK
+    // RESTOCK
     // =====================================
 
     async function restockProduct(product) {
         const quantityAnswer = prompt(
             "How many units are you adding to " + product.name + "?"
         );
-
         if (quantityAnswer === null) return;
 
         const quantity = Number(quantityAnswer);
 
-        if (quantityAnswer.trim() === "" ||
+        if (!quantityAnswer.trim() ||
             !Number.isInteger(quantity) || quantity <= 0) {
             alert("Please enter a valid whole number greater than zero.");
             return;
@@ -942,13 +978,11 @@ document.addEventListener("DOMContentLoaded", function () {
         const costAnswer = prompt(
             "Buying price for ONE " + product.name + " (KSh)?"
         );
-
         if (costAnswer === null) return;
 
         const unitCost = Number(costAnswer);
 
-        if (costAnswer.trim() === "" ||
-            !Number.isFinite(unitCost) || unitCost <= 0) {
+        if (!costAnswer.trim() || !Number.isFinite(unitCost) || unitCost <= 0) {
             alert("Please enter a valid buying price greater than zero.");
             return;
         }
@@ -960,8 +994,7 @@ document.addEventListener("DOMContentLoaded", function () {
             "\nTotal purchase cost: KSh " + money(quantity * unitCost)
         )) return;
 
-        const message = get("productMessage");
-        message.textContent = "Recording restock...";
+        get("productMessage").textContent = "Recording restock...";
 
         const { data, error } = await db.rpc("record_restock", {
             p_product_id: product.id,
@@ -970,21 +1003,22 @@ document.addEventListener("DOMContentLoaded", function () {
         });
 
         if (error) {
-            message.textContent = "Restocking failed: " + error.message;
+            get("productMessage").textContent =
+                "Restocking failed: " + error.message;
             alert("Restocking failed: " + error.message);
             return;
         }
 
-        const updatedProduct = Array.isArray(data) ? data[0] : data;
+        const updated = Array.isArray(data) ? data[0] : data;
 
-        message.textContent = product.name + " restocked successfully!";
+        get("productMessage").textContent =
+            product.name + " restocked successfully!";
 
-        if (updatedProduct) {
+        if (updated) {
             alert(
-                "Restock successful!\n\nProduct: " + updatedProduct.name +
-                "\nNew stock: " + updatedProduct.stock +
-                "\nAverage buying cost: KSh " +
-                money(updatedProduct.cost_price)
+                "Restock successful!\n\nProduct: " + updated.name +
+                "\nNew stock: " + updated.stock +
+                "\nAverage buying cost: KSh " + money(updated.cost_price)
             );
         } else {
             alert("Restock successful!");
@@ -1020,18 +1054,17 @@ document.addEventListener("DOMContentLoaded", function () {
         stockInput.step = "1";
         stockInput.value = product.stock;
 
-        const saveButton = document.createElement("button");
-        saveButton.textContent = "Save Changes";
+        const save = document.createElement("button");
+        save.type = "button";
+        save.textContent = "Save Changes";
 
-        const cancelButton = document.createElement("button");
-        cancelButton.textContent = "Cancel";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = "Cancel";
 
-        card.append(
-            nameInput, descriptionInput, priceInput,
-            stockInput, saveButton, cancelButton
-        );
+        card.append(nameInput, descriptionInput, priceInput, stockInput, save, cancel);
 
-        saveButton.onclick = async function () {
+        save.onclick = async function () {
             const name = nameInput.value.trim();
             const description = descriptionInput.value.trim();
             const price = Number(priceInput.value);
@@ -1044,30 +1077,30 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            saveButton.disabled = true;
-            saveButton.textContent = "Saving...";
+            save.disabled = true;
+            save.textContent = "Saving...";
 
             const { data, error } = await db.from("products")
                 .update({ name, description, price, stock })
                 .eq("id", product.id)
+                .eq("shop_id", currentShopId)
                 .select("id")
                 .maybeSingle();
 
             if (error || !data) {
                 alert("Product update failed: " +
                     (error ? error.message : "No product updated."));
-                saveButton.disabled = false;
-                saveButton.textContent = "Save Changes";
+                save.disabled = false;
+                save.textContent = "Save Changes";
                 return;
             }
 
             get("productMessage").textContent =
                 "Product updated successfully!";
-
             await loadProducts();
         };
 
-        cancelButton.onclick = () => loadProducts();
+        cancel.onclick = loadProducts;
     }
 
     // =====================================
@@ -1075,29 +1108,26 @@ document.addEventListener("DOMContentLoaded", function () {
     // =====================================
 
     async function deleteProduct(productId, productName) {
-        if (!confirm(
-            'Are you sure you want to delete "' + productName + '"?'
-        )) {
+        if (!confirm('Are you sure you want to delete "' + productName + '"?')) {
             return;
         }
 
         const { error } = await db.from("products")
             .delete()
-            .eq("id", productId);
+            .eq("id", productId)
+            .eq("shop_id", currentShopId);
 
         if (error) {
             alert("Failed to delete product: " + error.message);
             return;
         }
 
-        get("productMessage").textContent =
-            "Product deleted successfully!";
-
+        get("productMessage").textContent = "Product deleted successfully!";
         await loadProducts();
     }
 
     // =====================================
-    // RECORD SALE
+    // SINGLE PRODUCT SALE
     // =====================================
 
     get("saleForm").addEventListener("submit", async function (e) {
@@ -1123,14 +1153,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 p_quantity: quantity
             });
 
-            if (error) {
-                message.textContent = "Sale failed: " + error.message;
-                return;
-            }
+            if (error) throw error;
 
-            message.textContent =
-                "Sale recorded successfully! Stock reduced.";
-
+            message.textContent = "Sale recorded successfully! Stock reduced.";
             this.reset();
 
             await loadProducts();
@@ -1138,22 +1163,22 @@ document.addEventListener("DOMContentLoaded", function () {
             await loadDailySalesSummary();
             await loadMonthlySalesSummary();
             await loadFinancialReports();
-
         } catch (error) {
             message.textContent = "Sale failed: " + error.message;
-
         } finally {
             button.disabled = false;
-            button.textContent = "Record Sale";
+            button.textContent = "Record Single-Product Sale";
         }
     });
 
     // =====================================
-    // SHOP EXPENSES
+    // EXPENSES
     // =====================================
 
     get("expenseForm").addEventListener("submit", async function (e) {
         e.preventDefault();
+
+        if (!currentShopId) return;
 
         const message = get("expenseMessage");
         const description = get("expenseDescription").value.trim();
@@ -1175,53 +1200,41 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const { error } = await db.from("expenses").insert([{
+                shop_id: currentShopId,
                 description,
                 category,
                 amount
             }]);
 
-            if (error) {
-                message.textContent =
-                    "Failed to record expense: " + error.message;
-                return;
-            }
+            if (error) throw error;
 
             message.textContent = "Expense recorded successfully!";
             this.reset();
 
             await loadExpenses();
             await loadFinancialReports();
-
         } catch (error) {
             message.textContent = "Expense error: " + error.message;
-
         } finally {
             button.disabled = false;
             button.textContent = "Record Expense";
         }
     });
 
-    // =====================================
-    // LOAD EXPENSE HISTORY
-    // =====================================
-
     async function loadExpenses() {
         const container = get("expenses");
 
-        const { data, error } = await db.from("expenses")
-            .select("*")
+        const { data, error } = await shopQuery("expenses")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load expenses: " + error.message;
-            console.error(error.message);
+            container.textContent = "Failed to load expenses: " + error.message;
             return;
         }
 
         container.innerHTML = "";
 
-        if (!data || data.length === 0) {
+        if (!data || !data.length) {
             container.textContent = "No expenses recorded yet.";
             return;
         }
@@ -1234,12 +1247,10 @@ document.addEventListener("DOMContentLoaded", function () {
             heading.textContent = expense.description;
 
             const category = document.createElement("p");
-            category.textContent =
-                "Category: " + (expense.category || "Other");
+            category.textContent = "Category: " + (expense.category || "Other");
 
             const amount = document.createElement("p");
-            amount.textContent =
-                "Amount: KSh " + money(expense.amount);
+            amount.textContent = "Amount: KSh " + money(expense.amount);
 
             const date = document.createElement("p");
             date.textContent = "Date: " +
@@ -1259,19 +1270,17 @@ document.addEventListener("DOMContentLoaded", function () {
     async function loadSales() {
         const container = get("sales");
 
-        const { data, error } = await db.from("sales")
-            .select("*")
+        const { data, error } = await shopQuery("sales")
             .order("created_at", { ascending: false });
 
         if (error) {
-            container.textContent =
-                "Failed to load sales: " + error.message;
+            container.textContent = "Failed to load sales: " + error.message;
             return;
         }
 
         container.innerHTML = "";
 
-        if (!data || data.length === 0) {
+        if (!data || !data.length) {
             container.textContent = "No sales recorded yet.";
             return;
         }
@@ -1291,29 +1300,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 "Selling price per item: KSh " + money(sale.price);
 
             const total = document.createElement("p");
-            total.textContent =
-                "Sales total: KSh " + money(sale.total);
+            total.textContent = "Sales total: KSh " + money(sale.total);
 
             const cost = document.createElement("p");
             const profit = document.createElement("p");
 
-            if (sale.cost_price !== null &&
-                sale.cost_price !== undefined) {
+            if (sale.cost_price !== null && sale.cost_price !== undefined) {
                 const costTotal =
                     Number(sale.cost_price) * Number(sale.quantity);
 
-                cost.textContent =
-                    "Buying cost: KSh " + money(costTotal);
-
+                cost.textContent = "Buying cost: KSh " + money(costTotal);
                 profit.textContent =
-                    "Gross profit: KSh " +
-                    money(Number(sale.total) - costTotal);
+                    "Gross profit: KSh " + money(Number(sale.total) - costTotal);
             } else {
-                cost.textContent =
-                    "Buying cost: Not recorded for this sale";
-
-                profit.textContent =
-                    "Gross profit: Not available";
+                cost.textContent = "Buying cost: Not recorded for this sale";
+                profit.textContent = "Gross profit: Not available";
             }
 
             const date = document.createElement("p");
@@ -1322,16 +1323,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     "en-KE", { timeZone: SHOP_TIMEZONE }
                 );
 
-            card.append(
-                heading, quantity, price, total, cost, profit, date
-            );
-
+            card.append(heading, quantity, price, total, cost, profit, date);
             container.appendChild(card);
         });
     }
 
     // =====================================
-    // DAILY SALES SUMMARY
+    // DAILY SUMMARY
     // =====================================
 
     async function loadDailySalesSummary() {
@@ -1340,35 +1338,34 @@ document.addEventListener("DOMContentLoaded", function () {
         const transactionsElement = get("transactionsToday");
 
         const { data, error } = await db.from("sales")
-            .select("id, created_at, quantity, total, receipt_number");
+            .select("id,created_at,quantity,total,receipt_number")
+            .eq("shop_id", currentShopId);
 
         if (error) {
             totalElement.textContent = "Could not load";
             itemsElement.textContent = "Could not load";
             transactionsElement.textContent = "Could not load";
-            console.error(error.message);
             return;
         }
 
-        const todayKey = getKenyaDateKey(new Date());
-
-        const sales = (data || []).filter(sale =>
-            getKenyaDateKey(new Date(sale.created_at)) === todayKey
+        const today = getKenyaDateKey(new Date());
+        const sales = (data || []).filter(s =>
+            getKenyaDateKey(new Date(s.created_at)) === today
         );
 
         totalElement.textContent = money(
-            sales.reduce((sum, sale) => sum + Number(sale.total), 0)
+            sales.reduce((sum, s) => sum + Number(s.total), 0)
         );
 
         itemsElement.textContent = sales.reduce(
-            (sum, sale) => sum + Number(sale.quantity), 0
+            (sum, s) => sum + Number(s.quantity), 0
         );
 
         transactionsElement.textContent = countTransactions(sales);
     }
 
     // =====================================
-    // MONTHLY SALES SUMMARY
+    // MONTHLY SUMMARY
     // =====================================
 
     async function loadMonthlySalesSummary() {
@@ -1377,35 +1374,34 @@ document.addEventListener("DOMContentLoaded", function () {
         const transactionsElement = get("transactionsMonth");
 
         const { data, error } = await db.from("sales")
-            .select("id, created_at, quantity, total, receipt_number");
+            .select("id,created_at,quantity,total,receipt_number")
+            .eq("shop_id", currentShopId);
 
         if (error) {
             totalElement.textContent = "Could not load";
             itemsElement.textContent = "Could not load";
             transactionsElement.textContent = "Could not load";
-            console.error(error.message);
             return;
         }
 
-        const monthKey = getKenyaMonthKey(new Date());
-
-        const sales = (data || []).filter(sale =>
-            getKenyaMonthKey(new Date(sale.created_at)) === monthKey
+        const month = getKenyaMonthKey(new Date());
+        const sales = (data || []).filter(s =>
+            getKenyaMonthKey(new Date(s.created_at)) === month
         );
 
         totalElement.textContent = money(
-            sales.reduce((sum, sale) => sum + Number(sale.total), 0)
+            sales.reduce((sum, s) => sum + Number(s.total), 0)
         );
 
         itemsElement.textContent = sales.reduce(
-            (sum, sale) => sum + Number(sale.quantity), 0
+            (sum, s) => sum + Number(s.quantity), 0
         );
 
         transactionsElement.textContent = countTransactions(sales);
     }
 
     // =====================================
-    // FINANCIAL REPORTS SECTION
+    // FINANCIAL REPORTS
     // =====================================
 
     function createFinancialReportsSection() {
@@ -1467,10 +1463,10 @@ document.addEventListener("DOMContentLoaded", function () {
         const monthlyStatus = document.createElement("p");
         monthlyStatus.id = "monthlyProfitStatus";
 
-        const refreshButton = document.createElement("button");
-        refreshButton.type = "button";
-        refreshButton.textContent = "Refresh Financial Reports";
-        refreshButton.addEventListener("click", loadFinancialReports);
+        const refresh = document.createElement("button");
+        refresh.type = "button";
+        refresh.textContent = "Refresh Financial Reports";
+        refresh.onclick = loadFinancialReports;
 
         section.append(
             heading, description,
@@ -1479,15 +1475,11 @@ document.addEventListener("DOMContentLoaded", function () {
             divider,
             monthlyHeading, monthlyRevenue, monthlyGross,
             monthlyExpenses, monthlyNet, monthlyStatus,
-            refreshButton
+            refresh
         );
 
         get("adminDashboard").appendChild(section);
     }
-
-    // =====================================
-    // LOAD FINANCIAL REPORTS
-    // =====================================
 
     async function loadFinancialReports() {
         const ids = [
@@ -1508,10 +1500,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const [salesResult, expensesResult] = await Promise.all([
-                db.from("sales").select(
-                    "created_at, quantity, total, cost_price"
-                ),
-                db.from("expenses").select("created_at, amount")
+                db.from("sales")
+                    .select("created_at,quantity,total,cost_price")
+                    .eq("shop_id", currentShopId),
+
+                db.from("expenses")
+                    .select("created_at,amount")
+                    .eq("shop_id", currentShopId)
             ]);
 
             if (salesResult.error) throw salesResult.error;
@@ -1519,87 +1514,74 @@ document.addEventListener("DOMContentLoaded", function () {
 
             const sales = salesResult.data || [];
             const expenses = expensesResult.data || [];
-
-            const todayKey = getKenyaDateKey(new Date());
-            const monthKey = getKenyaMonthKey(new Date());
+            const today = getKenyaDateKey(new Date());
+            const month = getKenyaMonthKey(new Date());
 
             function calculatePeriod(periodSales, periodExpenses) {
                 let revenue = 0;
-                let grossProfit = 0;
-                let missingCostSales = 0;
+                let gross = 0;
+                let missing = 0;
 
                 periodSales.forEach(sale => {
                     const total = Number(sale.total) || 0;
                     const quantity = Number(sale.quantity) || 0;
-
                     revenue += total;
 
                     if (sale.cost_price === null ||
                         sale.cost_price === undefined) {
-                        missingCostSales++;
+                        missing++;
                     } else {
-                        grossProfit += total -
-                            (Number(sale.cost_price) * quantity);
+                        gross += total -
+                            Number(sale.cost_price) * quantity;
                     }
                 });
 
                 const expenseTotal = periodExpenses.reduce(
-                    (sum, expense) =>
-                        sum + Number(expense.amount || 0), 0
+                    (sum, expense) => sum + Number(expense.amount || 0), 0
                 );
 
                 return {
                     revenue,
-                    grossProfit,
+                    gross,
                     expenses: expenseTotal,
-                    netProfit: grossProfit - expenseTotal,
-                    missingCostSales
+                    net: gross - expenseTotal,
+                    missing
                 };
             }
 
-            const dailySales = sales.filter(sale =>
-                getKenyaDateKey(new Date(sale.created_at)) === todayKey
+            const daily = calculatePeriod(
+                sales.filter(s =>
+                    getKenyaDateKey(new Date(s.created_at)) === today
+                ),
+                expenses.filter(e =>
+                    getKenyaDateKey(new Date(e.created_at)) === today
+                )
             );
 
-            const dailyExpenses = expenses.filter(expense =>
-                getKenyaDateKey(new Date(expense.created_at)) === todayKey
+            const monthly = calculatePeriod(
+                sales.filter(s =>
+                    getKenyaMonthKey(new Date(s.created_at)) === month
+                ),
+                expenses.filter(e =>
+                    getKenyaMonthKey(new Date(e.created_at)) === month
+                )
             );
 
-            const monthlySales = sales.filter(sale =>
-                getKenyaMonthKey(new Date(sale.created_at)) === monthKey
-            );
+            function display(prefix, report) {
+                get(prefix + "Revenue").textContent = money(report.revenue);
+                get(prefix + "GrossProfit").textContent = money(report.gross);
+                get(prefix + "Expenses").textContent = money(report.expenses);
+                get(prefix + "NetProfit").textContent = money(report.net);
 
-            const monthlyExpenses = expenses.filter(expense =>
-                getKenyaMonthKey(new Date(expense.created_at)) === monthKey
-            );
-
-            const daily = calculatePeriod(dailySales, dailyExpenses);
-            const monthly = calculatePeriod(monthlySales, monthlyExpenses);
-
-            function displayReport(prefix, report) {
-                get(prefix + "Revenue").textContent =
-                    money(report.revenue);
-
-                get(prefix + "GrossProfit").textContent =
-                    money(report.grossProfit);
-
-                get(prefix + "Expenses").textContent =
-                    money(report.expenses);
-
-                get(prefix + "NetProfit").textContent =
-                    money(report.netProfit);
-
-                const status = get(prefix + "ProfitStatus");
-
-                status.textContent = report.missingCostSales > 0
-                    ? "INCOMPLETE: " + report.missingCostSales +
-                      " sale(s) have no recorded buying cost. Profit shows known amounts only."
-                    : "Complete: buying costs are recorded for all sales.";
+                get(prefix + "ProfitStatus").textContent =
+                    report.missing > 0
+                        ? "INCOMPLETE: " + report.missing +
+                          " sale(s) have no recorded buying cost. Profit shows known amounts only."
+                        : "Complete: buying costs are recorded for all sales.";
             }
 
-            displayReport("daily", daily);
-            displayReport("monthly", monthly);
-
+            display("daily", daily);
+            display("monthly", monthly);
         } catch (error) {
             console.error("Financial report error:", error);
 
@@ -1620,6 +1602,29 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     // =====================================
+    // REFRESH ALL DATA AFTER SHOP CHANGE
+    // =====================================
+
+    async function refreshAllDashboardData() {
+        const containers = [
+            "orders", "services", "products", "sales", "expenses"
+        ];
+
+        containers.forEach(id => {
+            if (get(id)) get(id).textContent = "Loading " + id + "...";
+        });
+
+        await loadOrders();
+        await loadServices();
+        await loadProducts();
+        await loadSales();
+        await loadExpenses();
+        await loadDailySalesSummary();
+        await loadMonthlySalesSummary();
+        await loadFinancialReports();
+    }
+
+    // =====================================
     // LOGOUT
     // =====================================
 
@@ -1630,6 +1635,11 @@ document.addEventListener("DOMContentLoaded", function () {
             clearInterval(orderCheckTimer);
             orderCheckTimer = null;
         }
+
+        currentShopId = null;
+        currentShopName = "";
+        window.AYANET_CURRENT_SHOP_ID = null;
+        window.AYANET_CURRENT_SHOP_NAME = "";
 
         showDashboard(false);
     });
@@ -1642,11 +1652,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
             const { data, error } = await db.auth.getSession();
 
-            if (error) {
-                console.error("Session error:", error.message);
-                showDashboard(false);
-                return;
-            }
+            if (error) throw error;
 
             if (!data.session) {
                 showDashboard(false);
@@ -1654,24 +1660,28 @@ document.addEventListener("DOMContentLoaded", function () {
             }
 
             showDashboard(true);
+
+            const userId = data.session.user.id;
+            await loadAvailableShops(userId);
+
             createFinancialReportsSection();
 
-            await loadOrders();
+            await refreshAllDashboardData();
             startOrderMonitoring();
-
-            await loadServices();
-            await loadProducts();
-            await loadSales();
-            await loadExpenses();
-            await loadDailySalesSummary();
-            await loadMonthlySalesSummary();
-            await loadFinancialReports();
-
         } catch (error) {
             console.error("Dashboard startup error:", error);
+            showDashboard(true);
+
+            let message = get("shopSelectorArea");
+            if (!message) {
+                message = document.createElement("p");
+                message.id = "shopSelectorArea";
+                get("adminDashboard").prepend(message);
+            }
+
+            message.textContent = "Dashboard setup error: " + error.message;
         }
     }
 
     startDashboard();
-
 });
