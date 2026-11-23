@@ -71,6 +71,9 @@ const SUPABASE_URL =
 const SUPABASE_KEY =
 "sb_publishable_tItrrAg_q9xSCskecgc5Jg_bJkxsOiu";
 
+const SHOP_REDIRECT_URL =
+"https://k989528-commits.github.io/ayanet-shop-system/register-shop.html";
+
 const db = window.supabase.createClient(
 SUPABASE_URL,
 SUPABASE_KEY
@@ -93,9 +96,11 @@ message.style.display = "block";
 function setBusy(busy) {
 createButton.disabled = busy;
 loginButton.disabled = busy;
+
 createButton.textContent = busy
 ? "Please wait..."
 : "Create Account & Register Shop";
+
 loginButton.textContent = busy
 ? "Please wait..."
 : "Sign In & Register Shop";
@@ -155,7 +160,10 @@ setBusy(true);
 try {
 const { data, error } = await db.auth.signUp({
 email: details.email,
-password: details.password
+password: details.password,
+options: {
+emailRedirectTo: SHOP_REDIRECT_URL
+}
 });
 
 if (error) throw error;
@@ -163,8 +171,9 @@ if (error) throw error;
 if (!data.session) {
 showMessage(
 "Your account request was received. Please check your email " +
-"for a confirmation message. After confirming your email, " +
-"return to this page and use Sign In & Register Shop.",
+"and confirm your email address. You will be returned to " +
+"AYANET Shop Management. Then enter your shop name, email " +
+"and the same password and select Sign In & Register Shop.",
 "info"
 );
 return;
@@ -214,6 +223,7 @@ loginButton.addEventListener("click", signInAndRegister);
 form.addEventListener("submit", function (event) {
 event.preventDefault();
 });
+
 })();
 </script>
 </body>
