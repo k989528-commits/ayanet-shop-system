@@ -95,7 +95,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }));
     }
 
-    function createShopSelector(shops) {
+    function createShopSelector(shops, userId, isPlatformAdmin) {
+        // Only active shops may enter the operational dashboard.
+        shops = (shops || []).filter(shop => shop.status === "active");
+
+        if (!shops.length) {
+            throw new Error("This account has no active shop. Pending shops must be approved first.");
+        }
+
         let area = get("shopSelectorArea");
 
         if (!area) {
@@ -147,21 +154,63 @@ document.addEventListener("DOMContentLoaded", function () {
         area.append(label, status);
 
         select.addEventListener("change", async function () {
-            const shop = shops.find(s => s.id === select.value);
-            if (!shop) return;
+            const selectedId = select.value;
+            const previousId = currentShopId;
+            const previousName = currentShopName;
+            const shop = shops.find(s => s.id === selectedId);
 
-            currentShopId = shop.id;
-            currentShopName = shop.name;
-            sessionStorage.setItem("ayanet_current_shop", shop.id);
+            if (!shop || selectedId === previousId) return;
 
-            status.textContent = "Managing: " + shop.name +
-                " — " + shop.status.toUpperCase();
+            select.disabled = true;
 
-            knownOrderIds = new Set();
-            ordersLoadedOnce = false;
+            try {
+                // Recheck status from Supabase at the moment of switching.
+                const { data: freshShop, error: shopError } = await db
+                    .from("shops")
+                    .select("id,name,status")
+                    .eq("id", selectedId)
+                    .maybeSingle();
 
-            announceShopChange();
-            await refreshAllDashboardData();
+                if (shopError) throw shopError;
+                if (!freshShop || freshShop.status !== "active") {
+                    throw new Error("This shop is no longer active. Dashboard access is blocked.");
+                }
+
+                // Recheck membership too; platform admins use the separate admin authority.
+                if (!isPlatformAdmin) {
+                    const { data: membership, error: membershipError } = await db
+                        .from("shop_members")
+                        .select("shop_id")
+                        .eq("shop_id", selectedId)
+                        .eq("user_id", userId)
+                        .maybeSingle();
+
+                    if (membershipError) throw membershipError;
+                    if (!membership) {
+                        throw new Error("Your membership for this shop is no longer active.");
+                    }
+                }
+
+                currentShopId = freshShop.id;
+                currentShopName = freshShop.name;
+                sessionStorage.setItem("ayanet_current_shop", freshShop.id);
+
+                status.textContent = "Managing: " + freshShop.name + " — ACTIVE";
+
+                knownOrderIds = new Set();
+                ordersLoadedOnce = false;
+
+                announceShopChange();
+                await refreshAllDashboardData();
+            } catch (error) {
+                select.value = previousId;
+                currentShopId = previousId;
+                currentShopName = previousName;
+                status.textContent = "Managing: " + previousName + " — ACTIVE";
+                alert("Shop switch blocked: " + error.message);
+            } finally {
+                select.disabled = false;
+            }
         });
 
         sessionStorage.setItem("ayanet_current_shop", currentShopId);
@@ -177,6 +226,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (adminError) throw adminError;
 
+        const isPlatformAdmin = Boolean(adminRecord);
+
         const { data: shops, error: shopsError } = await db
             .from("shops")
             .select("id,name,slug,status")
@@ -190,7 +241,9 @@ document.addEventListener("DOMContentLoaded", function () {
             throw new Error("No shops are linked to this account yet.");
         }
 
-        if (!adminRecord) {
+        let permittedShops = available;
+
+        if (!isPlatformAdmin) {
             const { data: memberships, error: membershipError } = await db
                 .from("shop_members")
                 .select("shop_id")
@@ -202,16 +255,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 (memberships || []).map(m => m.shop_id)
             );
 
-            const memberShops = available.filter(s => allowedIds.has(s.id));
-
-            if (!memberShops.length) {
-                throw new Error("Your account has no shop membership.");
-            }
-
-            createShopSelector(memberShops);
-        } else {
-            createShopSelector(available);
+            permittedShops = available.filter(s => allowedIds.has(s.id));
         }
+
+        const activeShops = permittedShops.filter(
+            shop => shop.status === "active"
+        );
+
+        if (!activeShops.length) {
+            throw new Error(
+                "This account has no active shop. Pending registrations must be approved, and suspended shops cannot use the dashboard."
+            );
+        }
+
+        createShopSelector(activeShops, userId, isPlatformAdmin);
     }
 
     // =====================================
@@ -1649,6 +1706,19 @@ document.addEventListener("DOMContentLoaded", function () {
     // =====================================
 
     async function startDashboard() {
+        // Keep the operational dashboard hidden until access is verified.
+        showDashboard(false);
+
+        if (orderCheckTimer) {
+            clearInterval(orderCheckTimer);
+            orderCheckTimer = null;
+        }
+
+        currentShopId = null;
+        currentShopName = "";
+        window.AYANET_CURRENT_SHOP_ID = null;
+        window.AYANET_CURRENT_SHOP_NAME = "";
+
         try {
             const { data, error } = await db.auth.getSession();
 
@@ -1659,27 +1729,40 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
             }
 
-            showDashboard(true);
-
             const userId = data.session.user.id;
+
+            // This must succeed and select an active, permitted shop first.
             await loadAvailableShops(userId);
 
-            createFinancialReportsSection();
-
-            await refreshAllDashboardData();
-            startOrderMonitoring();
-        } catch (error) {
-            console.error("Dashboard startup error:", error);
-            showDashboard(true);
-
-            let message = get("shopSelectorArea");
-            if (!message) {
-                message = document.createElement("p");
-                message.id = "shopSelectorArea";
-                get("adminDashboard").prepend(message);
+            if (!currentShopId) {
+                throw new Error("No active shop has been selected. Dashboard access is blocked.");
             }
 
-            message.textContent = "Dashboard setup error: " + error.message;
+            createFinancialReportsSection();
+            await refreshAllDashboardData();
+
+            // Reveal the dashboard only after shop access has been established.
+            showDashboard(true);
+            startOrderMonitoring();
+        } catch (error) {
+            console.error("Dashboard startup blocked:", error);
+
+            if (orderCheckTimer) {
+                clearInterval(orderCheckTimer);
+                orderCheckTimer = null;
+            }
+
+            currentShopId = null;
+            currentShopName = "";
+            window.AYANET_CURRENT_SHOP_ID = null;
+            window.AYANET_CURRENT_SHOP_NAME = "";
+
+            showDashboard(false);
+
+            const message = get("loginMessage");
+            if (message) {
+                message.textContent = "Dashboard access blocked: " + error.message;
+            }
         }
     }
 
