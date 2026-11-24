@@ -1,0 +1,120 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AYANET | Admin Centre</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:Arial,sans-serif;
+    background:#f1f4f9;
+    color:#17233b;
+}
+header{
+    background:#10264b;
+    color:white;
+    text-align:center;
+    padding:35px 15px;
+}
+.logo{
+    color:#d6ad55;
+    font-size:34px;
+    font-weight:bold;
+    letter-spacing:3px;
+}
+header p{margin:8px 0 0;color:#dce5f5}
+main{
+    max-width:850px;
+    margin:35px auto;
+    padding:15px;
+}
+h2{margin-bottom:8px}
+.intro{
+    color:#64748b;
+    margin-bottom:25px;
+    line-height:1.5;
+}
+.dashboard{
+    background:white;
+    border-radius:13px;
+    padding:25px;
+    margin-bottom:20px;
+    box-shadow:0 4px 18px #0000000d;
+    border-left:5px solid #d6ad55;
+}
+.dashboard h3{margin-top:0;color:#10264b}
+.dashboard p{color:#64748b;line-height:1.6}
+a.button{
+    display:inline-block;
+    background:#10264b;
+    color:white;
+    text-decoration:none;
+    padding:13px 20px;
+    border-radius:7px;
+    font-weight:bold;
+    margin-top:8px;
+}
+a.button.gold{
+    background:#b58a32;
+    color:#14213b;
+}
+footer{
+    text-align:center;
+    color:#8792a5;
+    font-size:13px;
+    padding:25px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="logo">AYANET</div>
+    <h1>ADMIN CENTRE</h1>
+    <p>Manage your shop and the AYANET platform</p>
+</header>
+
+<main>
+
+    <h2>Welcome to AYANET Administration</h2>
+
+    <p class="intro">
+        Choose the administration area you want to access.
+        Each dashboard has its own responsibilities and access controls.
+    </p>
+
+    <section class="dashboard">
+        <h3>1. My Shop Dashboard</h3>
+        <p>
+            Manage your shop operations, products, stock, sales,
+            customer orders, expenses and financial reports.
+        </p>
+        <a class="button" href="./dashboard.html">
+            OPEN SHOP DASHBOARD
+        </a>
+    </section>
+
+    <section class="dashboard">
+        <h3>2. Super Admin Centre</h3>
+        <p>
+            Manage AYANET shop registrations, review applications,
+            approve shops and suspend shop accounts.
+        </p>
+        <a class="button gold" href="./super-admin.html">
+            OPEN SUPER ADMIN CENTRE
+        </a>
+    </section>
+
+</main>
+
+<footer>
+    AYANET Shop Management System
+</footer>
+
+</body>
+</html>
