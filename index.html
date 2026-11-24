@@ -112,7 +112,6 @@ footer strong{color:#f4c542}
 <p>Enter your details to submit your order.</p>
 
 <form id="orderForm">
-
 <label for="customerName">Your Full Name</label>
 <input type="text" id="customerName" placeholder="Enter your name" required>
 
@@ -129,16 +128,13 @@ footer strong{color:#f4c542}
 <div id="printingFields" class="printing-fields">
 <strong style="color:#102b50">PRINTING DOCUMENT DETAILS</strong>
 <p>Upload your document in PDF or Word format. Maximum file size: 10 MB.</p>
-
 <label for="printingDocument">Choose Your Document</label>
 <input type="file" id="printingDocument" accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
-
 <label for="printType">Printing Type</label>
 <select id="printType">
 <option value="Black and White">Black and White</option>
 <option value="Colour">Colour</option>
 </select>
-
 <label for="printCopies">Number of Copies</label>
 <input type="number" id="printCopies" min="1" max="500" value="1">
 </div>
@@ -151,9 +147,7 @@ footer strong{color:#f4c542}
 <option value="Pay on delivery">Pay on delivery</option>
 </select>
 
-<div id="paymentNote" class="payment-note">
-Please select your preferred payment method.
-</div>
+<div id="paymentNote" class="payment-note">Please select your preferred payment method.</div>
 
 <div class="payment-box" id="paymentBox" style="display:none">
 <h3>💳 PAY WITH M-PESA</h3>
@@ -161,26 +155,13 @@ Please select your preferred payment method.
 <p><strong>Business name:</strong> Sonita Letikirich</p>
 <div class="payment-number">0743 431 448</div>
 <p><strong>How to pay:</strong></p>
-<p>
-1. Open your M-Pesa menu.<br>
-2. Select Pochi la Biashara.<br>
-3. Follow the prompts to pay the business above.<br>
-4. Enter the M-Pesa confirmation code below.
-</p>
-<div class="payment-warning">
-Please check the business name and amount before confirming your payment. AYANET will verify your payment before marking your order as paid.
-</div>
+<p>1. Open your M-Pesa menu.<br>2. Select Pochi la Biashara.<br>3. Follow the prompts to pay the business above.<br>4. Enter the M-Pesa confirmation code below.</p>
+<div class="payment-warning">Please check the business name and amount before confirming your payment. AYANET will verify your payment before marking your order as paid.</div>
 </div>
 
 <div id="mpesaCodeField" style="display:none">
 <label for="mpesaCode">M-Pesa Confirmation Code</label>
-<input
-type="text"
-id="mpesaCode"
-placeholder="Enter your M-Pesa transaction code"
-maxlength="20"
-autocomplete="off"
->
+<input type="text" id="mpesaCode" placeholder="Enter your M-Pesa transaction code" maxlength="20" autocomplete="off">
 </div>
 
 <label for="orderDetails">Order Details</label>
@@ -215,7 +196,6 @@ const cartTotal=document.getElementById("cartTotal");
 const form=document.getElementById("orderForm");
 const button=document.getElementById("submitButton");
 const message=document.getElementById("message");
-
 const printingFields=document.getElementById("printingFields");
 const printingDocument=document.getElementById("printingDocument");
 const printType=document.getElementById("printType");
@@ -233,9 +213,7 @@ let cart=[];
 const MAX_FILE_SIZE=10*1024*1024;
 const STORAGE_BUCKET="printing-documents";
 
-function money(value){
-return Number(value||0).toFixed(2);
-}
+function money(value){return Number(value||0).toFixed(2);}
 
 function showMessage(text,color){
 message.style.color=color;
@@ -244,22 +222,16 @@ message.textContent=text;
 
 function isPrintingService(service){
 if(!service)return false;
-
-return (
-String(service.category||"").toLowerCase().includes("print")||
-String(service.service_name||"").toLowerCase().includes("print")
-);
+return String(service.category||"").toLowerCase().includes("print")||
+String(service.service_name||"").toLowerCase().includes("print");
 }
 
 function updatePaymentFields(){
-
 const choice=paymentMethod.value;
 const payNow=choice==="Pay now - M-Pesa Pochi la Biashara";
-
 paymentBox.style.display=payNow?"block":"none";
 mpesaCodeField.style.display=payNow?"block":"none";
 mpesaCodeInput.required=payNow;
-
 if(payNow){
 paymentNote.textContent="Please pay using Pochi la Biashara and enter your M-Pesa confirmation code below. Your payment will be verified by AYANET.";
 }else if(choice==="Pay on pickup"){
@@ -270,36 +242,25 @@ paymentNote.textContent="You can pay when your order is delivered. No M-Pesa cod
 paymentNote.textContent="Please select your preferred payment method.";
 }
 }
-
 paymentMethod.addEventListener("change",updatePaymentFields);
 
 function updatePrintingFields(){
-const service=availableServices.find(
-item=>String(item.id)===serviceSelect.value
-);
-
+const service=availableServices.find(item=>String(item.id)===serviceSelect.value);
 const printing=isPrintingService(service);
-
 printingFields.classList.toggle("visible",printing);
 printingDocument.required=printing;
 }
 
 function validPrintingFile(file){
 if(!file)return false;
-
 const extension=file.name.split(".").pop().toLowerCase();
-
 return ["pdf","doc","docx"].includes(extension);
 }
 
 async function loadServices(){
-
-const {data,error}=await db
-.from("services")
+const {data,error}=await db.from("services")
 .select("id,category,service_name,description,price")
-.eq("is_active",true)
-.order("category")
-.order("service_name");
+.eq("is_active",true).order("category").order("service_name");
 
 if(error){
 servicesContainer.textContent="Could not load services. Please refresh.";
@@ -310,20 +271,16 @@ return;
 availableServices=data||[];
 serviceSelect.innerHTML='<option value="">-- No service selected --</option>';
 servicesContainer.innerHTML="";
-
 if(!availableServices.length){
 servicesContainer.textContent="No services currently available.";
 return;
 }
 
 const categories={};
-
 availableServices.forEach(service=>{
 const category=service.category||"Other";
-
 if(!categories[category])categories[category]=[];
 categories[category].push(service);
-
 const option=document.createElement("option");
 option.value=service.id;
 option.textContent=category+" - "+service.service_name+" (KSh "+money(service.price)+")";
@@ -342,17 +299,13 @@ const icons={
 Object.keys(categories).forEach(category=>{
 const card=document.createElement("div");
 card.className="service";
-
 const heading=document.createElement("h3");
 heading.textContent=(icons[category.toLowerCase()]||"🛍️")+" "+category;
-
 const description=document.createElement("p");
 description.className="service-description";
 description.textContent="Click to view available services and prices.";
-
 const list=document.createElement("div");
 list.className="subcategory-list";
-
 heading.style.cursor="pointer";
 heading.addEventListener("click",()=>list.classList.toggle("open"));
 description.addEventListener("click",()=>list.classList.toggle("open"));
@@ -360,45 +313,35 @@ description.addEventListener("click",()=>list.classList.toggle("open"));
 categories[category].forEach(service=>{
 const item=document.createElement("div");
 item.className="subcategory";
-
 const name=document.createElement("h4");
 name.textContent=service.service_name;
-
 const details=document.createElement("p");
 details.textContent=service.description||"AYANET quality service.";
-
 const price=document.createElement("p");
 price.className="service-price";
 price.textContent="KSh "+money(service.price);
-
 const choose=document.createElement("button");
 choose.className="choose-service";
 choose.type="button";
 choose.textContent="Choose This Service";
-
 choose.addEventListener("click",()=>{
 serviceSelect.value=service.id;
 serviceSelect.dispatchEvent(new Event("change"));
 document.getElementById("orderDetails").focus();
 document.querySelector(".order-section").scrollIntoView({behavior:"smooth"});
 });
-
 item.append(name,details,price,choose);
 list.appendChild(item);
 });
-
 card.append(heading,description,list);
 servicesContainer.appendChild(card);
 });
 }
 
 async function loadProducts(){
-
-const {data,error}=await db
-.from("customer_products")
+const {data,error}=await db.from("customer_products")
 .select("id,name,description,price,stock,image_url")
-.gt("stock",0)
-.order("name");
+.gt("stock",0).order("name");
 
 if(error){
 productsContainer.textContent="Could not load products. Please refresh.";
@@ -408,22 +351,18 @@ return;
 
 availableProducts=data||[];
 productsContainer.innerHTML="";
-
 if(!availableProducts.length){
 productsContainer.textContent="No products currently available.";
 return;
 }
 
 availableProducts.forEach(product=>{
-
 const card=document.createElement("div");
 card.className="product";
-
 if(product.image_url){
 const img=document.createElement("img");
 img.src=product.image_url;
 img.alt=product.name;
-
 img.onerror=()=>{
 img.remove();
 const placeholder=document.createElement("div");
@@ -431,7 +370,6 @@ placeholder.className="placeholder";
 placeholder.textContent="🛍️";
 card.prepend(placeholder);
 };
-
 card.appendChild(img);
 }else{
 const placeholder=document.createElement("div");
@@ -439,34 +377,26 @@ placeholder.className="placeholder";
 placeholder.textContent="🛍️";
 card.appendChild(placeholder);
 }
-
 const name=document.createElement("h3");
 name.textContent=product.name;
-
 const description=document.createElement("p");
 description.textContent=product.description||"AYANET quality product.";
-
 const price=document.createElement("p");
 price.className="product-price";
 price.textContent="KSh "+money(product.price);
-
 const stock=document.createElement("p");
 stock.textContent="Available stock: "+product.stock;
-
 const add=document.createElement("button");
 add.className="add-cart";
 add.textContent="ADD TO CART";
 add.addEventListener("click",()=>addToCart(product));
-
 card.append(name,description,price,stock,add);
 productsContainer.appendChild(card);
 });
 }
 
 function addToCart(product){
-
 const existing=cart.find(item=>String(item.id)===String(product.id));
-
 if(existing){
 if(existing.quantity>=Number(product.stock)){
 alert("Sorry, no more stock is available.");
@@ -476,96 +406,68 @@ existing.quantity++;
 }else{
 cart.push({...product,quantity:1});
 }
-
 renderCart();
 }
 
 function renderCart(){
-
 cartItems.innerHTML="";
-
 if(cart.length===0){
 cartItems.innerHTML='<p class="empty-cart">Your shopping cart is empty.</p>';
 }else{
-
 cart.forEach(item=>{
-
 const row=document.createElement("div");
 row.className="cart-item";
-
 const info=document.createElement("div");
 const name=document.createElement("strong");
 name.textContent=item.name;
-
 const amount=document.createElement("p");
 amount.textContent="KSh "+money(item.price)+" each";
-
 info.append(name,amount);
-
 const controls=document.createElement("div");
-
 const minus=document.createElement("button");
 minus.className="quantity-button";
 minus.textContent="−";
-
 minus.addEventListener("click",()=>{
 item.quantity--;
-
-if(item.quantity<=0){
-cart=cart.filter(product=>String(product.id)!==String(item.id));
-}
-
+if(item.quantity<=0)cart=cart.filter(product=>String(product.id)!==String(item.id));
 renderCart();
 });
-
 const quantity=document.createElement("strong");
 quantity.textContent=" "+item.quantity+" ";
-
 const plus=document.createElement("button");
 plus.className="quantity-button";
 plus.textContent="+";
-
 plus.addEventListener("click",()=>{
 if(item.quantity>=Number(item.stock)){
 alert("Sorry, no more stock is available.");
 return;
 }
-
 item.quantity++;
 renderCart();
 });
-
 const remove=document.createElement("button");
 remove.className="remove-button";
 remove.textContent="Remove";
-
 remove.addEventListener("click",()=>{
 cart=cart.filter(product=>String(product.id)!==String(item.id));
 renderCart();
 });
-
 controls.append(minus,quantity,plus,remove);
 row.append(info,controls);
 cartItems.appendChild(row);
 });
 }
-
 const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
 cartTotal.textContent="Total: KSh "+money(total);
 }
 
 serviceSelect.addEventListener("change",function(){
-
 const service=availableServices.find(item=>String(item.id)===this.value);
-
-selectedPrice.textContent=service?
-"Customer Price: KSh "+money(service.price):"";
-
+selectedPrice.textContent=service?"Customer Price: KSh "+money(service.price):"";
 updatePrintingFields();
 });
 
 form.addEventListener("submit",async function(event){
-
 event.preventDefault();
 
 const selected=availableServices.find(item=>String(item.id)===serviceSelect.value);
@@ -577,12 +479,10 @@ if(!chosenPayment){
 showMessage("Please choose how you want to pay.","red");
 return;
 }
-
 if(!selected&&cart.length===0){
 showMessage("Please select a service or add a product to your cart.","red");
 return;
 }
-
 if(printing&&cart.length>0){
 showMessage("Please submit your printing order separately from products in your shopping cart.","red");
 return;
@@ -597,35 +497,27 @@ if(!name||!phone||!details){
 showMessage("Please complete all required fields.","red");
 return;
 }
-
 if(payNow&&!/^[A-Z0-9]{6,20}$/.test(mpesaCode)){
 showMessage("Please enter a valid M-Pesa confirmation code (6–20 letters or numbers).","red");
 return;
 }
 
 let file=null;
-
 if(printing){
-
 file=printingDocument.files[0];
-
 if(!file){
 showMessage("Please choose your printing document.","red");
 return;
 }
-
 if(!validPrintingFile(file)){
 showMessage("Please upload a PDF or Word document only.","red");
 return;
 }
-
 if(file.size>MAX_FILE_SIZE){
 showMessage("Your document is larger than 10 MB. Please choose a smaller file.","red");
 return;
 }
-
 const copies=Number(printCopies.value);
-
 if(!Number.isInteger(copies)||copies<1||copies>500){
 showMessage("Please enter between 1 and 500 copies.","red");
 return;
@@ -638,33 +530,26 @@ showMessage("","");
 
 let orderDescription="";
 let uploadedPath=null;
-
 orderDescription+="PAYMENT METHOD: "+chosenPayment+"\n";
 
 if(selected){
 orderDescription+="SERVICE: "+selected.category+" - "+selected.service_name+
 " | Price: KSh "+money(selected.price)+"\n";
 }
-
 if(printing){
 orderDescription+="PRINT TYPE: "+printType.value+"\n";
 orderDescription+="NUMBER OF COPIES: "+printCopies.value+"\n";
 }
-
 if(cart.length){
 orderDescription+="PRODUCTS:\n";
-
 cart.forEach(item=>{
 orderDescription+=item.name+" x "+item.quantity+
 " @ KSh "+money(item.price)+" = KSh "+
 money(item.price*item.quantity)+"\n";
 });
-
 const total=cart.reduce((sum,item)=>sum+(Number(item.price)*item.quantity),0);
-
 orderDescription+="PRODUCT TOTAL: KSh "+money(total)+"\n";
 }
-
 orderDescription+="CUSTOMER DETAILS: "+details+"\n";
 
 if(payNow){
@@ -679,75 +564,50 @@ orderDescription+="CUSTOMER WILL PAY: "+chosenPayment;
 }
 
 try{
-
 if(cart.length){
-
 const {data,error}=await db.rpc("place_product_order",{
 p_customer_name:name,
 p_customer_phone:phone,
-p_service_name:selected?
-selected.category+" - "+selected.service_name:
-"Product Order",
+p_service_name:selected?selected.category+" - "+selected.service_name:"Product Order",
 p_order_details:orderDescription,
-p_items:cart.map(item=>({
-product_id:Number(item.id),
-quantity:Number(item.quantity)
-}))
+p_items:cart.map(item=>({product_id:Number(item.id),quantity:Number(item.quantity)}))
 });
-
 if(error)throw error;
-
 console.log("AYANET product order number:",data);
-
 }else{
-
 if(printing){
-
 const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"_");
 const uniqueName=Date.now()+"_"+Math.random().toString(36).slice(2,10)+"_"+safeName;
-
 uploadedPath="customer-uploads/"+uniqueName;
 
-const {error:uploadError}=await db.storage
-.from(STORAGE_BUCKET)
-.upload(uploadedPath,file,{
+const {error:uploadError}=await db.storage.from(STORAGE_BUCKET).upload(
+uploadedPath,file,{
 cacheControl:"3600",
 upsert:false,
 contentType:file.type||"application/octet-stream"
 });
-
 if(uploadError)throw uploadError;
 }
 
-const orderRecord={
-customer_name:name,
-customer_phone:phone,
-service_name:selected.category+" - "+selected.service_name+
+const {data,error}=await db.rpc("submit_customer_order",{
+p_customer_name:name,
+p_customer_phone:phone,
+p_service_name:selected.category+" - "+selected.service_name+
 " (KSh "+money(selected.price)+")",
-order_details:orderDescription,
-payment_method:chosenPayment,
-mpesa_code:payNow?mpesaCode:null,
-payment_status:"Pending"
-};
-
-if(printing){
-orderRecord.document_url=uploadedPath;
-orderRecord.document_name=file.name;
-}
-
-const {error}=await db
-.from("orders")
-.insert([orderRecord]);
-
+p_order_details:orderDescription,
+p_payment_method:chosenPayment,
+p_mpesa_code:payNow?mpesaCode:null,
+p_document_url:uploadedPath,
+p_document_name:printing?file.name:null
+});
 if(error)throw error;
-
+console.log("AYANET service order number:",data);
 }
 
 showMessage(
 "Your order has been submitted successfully! Payment method: "+chosenPayment+". AYANET will confirm your order. Thank you for choosing AYANET.",
 "green"
 );
-
 form.reset();
 cart=[];
 renderCart();
@@ -755,35 +615,22 @@ selectedPrice.textContent="";
 printingFields.classList.remove("visible");
 printingDocument.required=false;
 updatePaymentFields();
-
 await loadProducts();
 
 }catch(error){
-
 console.error("AYANET checkout error:",error);
-
 if(uploadedPath){
-const {error:removeError}=await db.storage
-.from(STORAGE_BUCKET)
-.remove([uploadedPath]);
-
-if(removeError){
-console.error("Could not remove unused uploaded document:",removeError);
+const {error:removeError}=await db.storage.from(STORAGE_BUCKET).remove([uploadedPath]);
+if(removeError)console.error("Could not remove unused uploaded document:",removeError);
 }
-}
-
 showMessage(
 "Sorry, your order could not be submitted. "+(error.message||"Please try again."),
 "red"
 );
-
 }finally{
-
 button.disabled=false;
 button.textContent="SUBMIT ORDER";
-
 }
-
 });
 
 updatePaymentFields();
