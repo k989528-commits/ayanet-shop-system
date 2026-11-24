@@ -1,9 +1,8 @@
 
 /* =====================================
    AYANET MULTI-SHOP PRODUCT PHOTOS
-   PHOTO UPLOAD AND PREVIEW
-   REPLACE AND DELETE PHOTOS
-   SHOP-SPECIFIC PRODUCT MANAGEMENT
+   SHOP-SPECIFIC PHOTO STORAGE
+   LEGACY PHOTO COMPATIBILITY
 ===================================== */
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -24,7 +23,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return window.AYANET_CURRENT_SHOP_ID || null;
     }
 
-    // PRODUCT PHOTO INPUT
+    // PHOTO INPUT
     const label = document.createElement("label");
     label.textContent = "Choose Product Photo";
 
@@ -78,14 +77,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (position === -1) return null;
 
-        return decodeURIComponent(
-            url.substring(position + marker.length)
+        try {
+            return decodeURIComponent(
+                url.substring(position + marker.length)
+            );
+        } catch {
+            return null;
+        }
+    }
+
+    // Only remove files inside the selected shop's folder.
+    // Older photos in the bucket root are deliberately preserved.
+    function belongsToShopFolder(path, shopId) {
+        return Boolean(
+            path &&
+            shopId &&
+            path.startsWith(shopId + "/")
         );
     }
 
-    async function uploadPhoto(file, productId) {
+    async function uploadPhoto(file, shopId, productId) {
         const filename =
-            productId + "-" + Date.now() + "." + extensionFor(file);
+            shopId + "/" +
+            productId + "-" + Date.now() + "." +
+            extensionFor(file);
 
         const { error } = await db.storage
             .from(bucket)
@@ -98,7 +113,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
         return {
             filename,
-            url: db.storage.from(bucket).getPublicUrl(filename).data.publicUrl
+            url: db.storage
+                .from(bucket)
+                .getPublicUrl(filename).data.publicUrl
         };
     }
 
@@ -114,6 +131,27 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
+    async function removeOldShopPhoto(url, shopId) {
+        const oldPath = storagePath(url);
+
+        if (!belongsToShopFolder(oldPath, shopId)) {
+            // Legacy root-level photos are kept safely.
+            return;
+        }
+
+        const { error } = await db.storage
+            .from(bucket)
+            .remove([oldPath]);
+
+        if (error) {
+            console.warn("Old photo cleanup failed:", error.message);
+            alert(
+                "The new photo was saved, but the old photo could not be cleaned up: " +
+                error.message
+            );
+        }
+    }
+
     // ADD PRODUCT WITH OPTIONAL PHOTO
     form.addEventListener("submit", async function (event) {
         event.preventDefault();
@@ -122,14 +160,16 @@ document.addEventListener("DOMContentLoaded", function () {
         const shopId = currentShopId();
 
         if (!shopId) {
-            message.textContent = "Please select a shop before adding a product.";
+            message.textContent =
+                "Please select a shop before adding a product.";
             return;
         }
 
         const file = photoInput.files[0];
 
         if (file && !validPhoto(file)) {
-            message.textContent = "Choose a valid photo of 5 MB or less.";
+            message.textContent =
+                "Choose a valid photo of 5 MB or less.";
             return;
         }
 
@@ -142,9 +182,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 shop_id: shopId,
                 name: document.getElementById("productName").value.trim(),
                 description: document.getElementById("productDescription").value.trim(),
-                cost_price: Number(document.getElementById("productCostPrice").value),
-                price: Number(document.getElementById("productPrice").value),
-                stock: Number(document.getElementById("productStock").value),
+                cost_price: Number(
+                    document.getElementById("productCostPrice").value
+                ),
+                price: Number(
+                    document.getElementById("productPrice").value
+                ),
+                stock: Number(
+                    document.getElementById("productStock").value
+                ),
                 image_url: null
             };
 
@@ -160,14 +206,16 @@ document.addEventListener("DOMContentLoaded", function () {
             if (file) {
                 message.textContent = "Uploading photo...";
 
-                const uploaded = await uploadPhoto(file, "new");
+                const uploaded = await uploadPhoto(file, shopId, "new");
 
                 uploadedFilename = uploaded.filename;
                 product.image_url = uploaded.url;
             }
 
             if (currentShopId() !== shopId) {
-                throw new Error("The selected shop changed. Please try again.");
+                throw new Error(
+                    "The selected shop changed. Please try again."
+                );
             }
 
             message.textContent = "Saving product...";
@@ -203,7 +251,9 @@ document.addEventListener("DOMContentLoaded", function () {
     manager.innerHTML = `
         <h3>Product Photo Management</h3>
         <p>View, replace or delete product photos without deleting products.</p>
-        <button type="button" id="loadProductPhotos">Load Product Photos</button>
+        <button type="button" id="loadProductPhotos">
+            Load Product Photos
+        </button>
         <div id="productPhotoList"></div>
     `;
 
@@ -216,7 +266,8 @@ document.addEventListener("DOMContentLoaded", function () {
         const shopId = currentShopId();
 
         if (!shopId) {
-            photoList.textContent = "Select a shop first to manage its product photos.";
+            photoList.textContent =
+                "Select a shop first to manage its product photos.";
             return;
         }
 
@@ -232,13 +283,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
             if (error) throw error;
 
-            // Ignore results from a shop that is no longer selected.
             if (currentShopId() !== shopId) return;
 
             photoList.innerHTML = "";
 
             if (!data || data.length === 0) {
-                photoList.textContent = "No products found in this shop.";
+                photoList.textContent =
+                    "No products found in this shop.";
                 return;
             }
 
@@ -260,7 +311,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     image.style.display = "block";
                     image.style.marginBottom = "10px";
                     card.appendChild(image);
-
                 } else {
                     const noPhoto = document.createElement("p");
                     noPhoto.textContent = "No photo uploaded.";
@@ -272,6 +322,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 fileInput.accept = "image/jpeg,image/png,image/webp";
                 card.appendChild(fileInput);
 
+                // REPLACE PHOTO
                 const replaceButton = document.createElement("button");
                 replaceButton.type = "button";
                 replaceButton.textContent = "Replace Photo";
@@ -290,7 +341,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
 
                     if (currentShopId() !== shopId) {
-                        alert("The selected shop has changed. Refresh the photo list.");
+                        alert(
+                            "The selected shop has changed. Refresh the photo list."
+                        );
                         return;
                     }
 
@@ -299,11 +352,18 @@ document.addEventListener("DOMContentLoaded", function () {
                     let uploadedFilename = null;
 
                     try {
-                        const uploaded = await uploadPhoto(file, product.id);
+                        const uploaded = await uploadPhoto(
+                            file,
+                            shopId,
+                            product.id
+                        );
+
                         uploadedFilename = uploaded.filename;
 
                         if (currentShopId() !== shopId) {
-                            throw new Error("The selected shop changed. Please try again.");
+                            throw new Error(
+                                "The selected shop changed. Please try again."
+                            );
                         }
 
                         const { data: updatedProduct, error } = await db
@@ -316,25 +376,17 @@ document.addEventListener("DOMContentLoaded", function () {
                         if (error) throw error;
 
                         if (!updatedProduct || updatedProduct.length === 0) {
-                            throw new Error("Product was not updated. Check shop access.");
+                            throw new Error(
+                                "Product was not updated. Check shop access."
+                            );
                         }
 
                         uploadedFilename = null;
 
-                        const oldPath = storagePath(product.image_url);
-
-                        if (oldPath) {
-                            const { error: cleanupError } = await db.storage
-                                .from(bucket)
-                                .remove([oldPath]);
-
-                            if (cleanupError) {
-                                alert(
-                                    "New photo saved, but old photo cleanup failed: " +
-                                    cleanupError.message
-                                );
-                            }
-                        }
+                        await removeOldShopPhoto(
+                            product.image_url,
+                            shopId
+                        );
 
                         alert("Product photo replaced successfully!");
 
@@ -356,6 +408,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 card.appendChild(replaceButton);
 
+                // DELETE PHOTO
                 if (product.image_url) {
                     const deleteButton = document.createElement("button");
                     deleteButton.type = "button";
@@ -371,7 +424,9 @@ document.addEventListener("DOMContentLoaded", function () {
                         }
 
                         if (currentShopId() !== shopId) {
-                            alert("The selected shop has changed. Refresh the photo list.");
+                            alert(
+                                "The selected shop has changed. Refresh the photo list."
+                            );
                             return;
                         }
 
@@ -388,26 +443,19 @@ document.addEventListener("DOMContentLoaded", function () {
                             if (error) throw error;
 
                             if (!updatedProduct || updatedProduct.length === 0) {
-                                throw new Error("Product was not updated. Check shop access.");
+                                throw new Error(
+                                    "Product was not updated. Check shop access."
+                                );
                             }
 
-                            const oldPath = storagePath(product.image_url);
+                            await removeOldShopPhoto(
+                                product.image_url,
+                                shopId
+                            );
 
-                            if (oldPath) {
-                                const { error: storageError } = await db
-                                    .storage
-                                    .from(bucket)
-                                    .remove([oldPath]);
-
-                                if (storageError) {
-                                    alert(
-                                        "Photo removed from product, but storage cleanup failed: " +
-                                        storageError.message
-                                    );
-                                }
-                            }
-
-                            alert("Photo deleted. The product is still saved.");
+                            alert(
+                                "Photo removed from product. The product is still saved."
+                            );
 
                             if (currentShopId() === shopId) {
                                 await loadProductPhotos();
@@ -440,7 +488,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     loadButton.addEventListener("click", loadProductPhotos);
 
-    // Refresh photo management when the selected shop changes.
+    // HANDLE SHOP CHANGES
     document.addEventListener("ayanet-shop-changed", function () {
         photoList.textContent =
             currentShopId()
